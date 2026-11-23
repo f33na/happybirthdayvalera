@@ -7,6 +7,10 @@ A small voice-input widget: a mic button and a dark pill with a live waveform, a
 language chip. It does real speech-to-text in **English, Russian, German and French**, and by default it runs
 **locally** with Whisper. No audio leaves the device.
 
+![The pill celebrates a Russian "happy birthday" with a rainbow glow](docs/media/dioxus-demo-celebrate.png)
+
+![Dictation in Russian: idle, model loading, listening, then the text](docs/media/dioxus-demo-ru.gif)
+
 It ships in two flavours with one name and one look:
 
 | Flavour | Package | Path |
@@ -89,6 +93,11 @@ A stand is a small dictation app that uses the published API with one kit, as an
 | React + `@evinvest/uikit` | `just stand-react-evinvest` | 5202 |
 | Dioxus web + shadcn/ui look | `just stand-dioxus-shadcn` | 8201 |
 | Dioxus web + `ev_lib` uikit | `just stand-dioxus-evinvest` | 8202 |
+
+| shadcn/ui | `@evinvest/uikit` / `ev_lib` |
+| --- | --- |
+| ![React stand, shadcn light](docs/media/stand-react-shadcn-light-listening.png) | ![React stand, evinvest dark](docs/media/stand-react-evinvest-dark-listening.png) |
+| ![Dioxus stand, shadcn dark](docs/media/stand-dioxus-shadcn-dark-listening.png) | ![Dioxus stand, evinvest light](docs/media/stand-dioxus-evinvest-light-listening.png) |
 
 ## Development
 
