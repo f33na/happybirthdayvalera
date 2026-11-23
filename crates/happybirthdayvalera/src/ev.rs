@@ -11,11 +11,18 @@ use crate::components::{MicParts, STYLESHEET, mic_button_props, pill_props, rend
 use crate::listener::Listener;
 use crate::theme::{MicClassNames, PillClassNames, Theme, class_list};
 
+/// The widget's mic size, taken from the control box that the kit's `Size` class sets on the same element.
+const EV_MIC_SIZE: &str = "--hbv-size-mic: var(--control-box)";
+
 /// The mic as a native `<button>` that wears the kit's icon-button classes.
 ///
 /// The kit's `Button` forwards no `aria-*` attribute, so the adapter renders the element itself with
 /// `button_classes`, keeping `aria-pressed` and `aria-label`. The variant is `Primary` while pressed and
 /// `Secondary` otherwise; both come from the kit.
+///
+/// The kit's icon button sets only the height (`h-(--control-box)`), and that utility beats the widget's
+/// block size, while the widget still sets the width. The inline style ties the widget size to the same
+/// `--control-box` that the kit's `size` sets, so the button stays square at every kit size.
 #[component]
 pub fn EvMicButton(
     listener: Listener,
@@ -34,6 +41,7 @@ pub fn EvMicButton(
     let p = mic_button_props(listener, Some(theme.unwrap_or(Theme::Evinvest)));
     let variant = if p.state.is_pressed() { ButtonVariant::Primary } else { ButtonVariant::Secondary };
     let kit = button_classes(&variant, size, true, None, "");
+    let style = format!("{}; {EV_MIC_SIZE}", p.style);
     let click = p.clone();
     rsx! {
         document::Stylesheet { href: STYLESHEET }
@@ -47,7 +55,7 @@ pub fn EvMicButton(
             "data-celebrate": p.data_celebrate,
             aria_pressed: p.aria_pressed,
             aria_label: p.aria_label,
-            style: p.style,
+            style,
             onclick: move |_| click.click(),
             onmounted: move |_| listener.kick(),
             MicParts { ring_class: class_names.ring, icon_class: class_names.icon }
