@@ -251,6 +251,21 @@ Also: `--hbv-radius-chip` ← `calc(var(--radius) - 4px)` (shadcn) or `var(--chi
 `--hbv-color-mic-icon-active`; add it to `design-tokens.json` with the default `#ffffff`. shadcn v3 hosts use
 HSL triplets (`hsl(var(--popover))`); v3 is out of scope, and the README says how to override.
 
+### Cascade layers
+
+The generated stylesheet starts with `@layer theme, base, components, utilities;`, which is Tailwind v4's
+own order statement. It then puts every widget rule, presets included, in `@layer components`.
+
+- In a Tailwind host, utilities beat the widget rules without `!`, and preflight (`base`) cannot reset them.
+  This holds whatever the import order, because the first order statement fixes the order.
+- In a host without Tailwind, any unlayered host CSS beats the widget rules.
+- The token defaults stay inside `:where(...)` (zero specificity).
+
+`.hbv-lang--bare` resets a chip button that sits inside a kit badge. It sets a transparent background, no
+border, no padding, and inherits colour and font. The Dioxus evinvest adapter uses it, because the kit's
+`Badge` has no `asChild` there. `.hbv-pill__status` never shrinks; `.hbv-pill__text` takes the remaining
+width and ends with an ellipsis.
+
 ### 2. Slots and your own button
 
 - Every component accepts a root class (`className` in React, `class` in Dioxus). It also accepts a per-part
