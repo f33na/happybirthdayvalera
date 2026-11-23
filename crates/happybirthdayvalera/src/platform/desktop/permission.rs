@@ -9,6 +9,9 @@ use std::future::Future;
 use crate::machine::ErrorCode;
 
 /// The OS answer, reduced to what the adapter acts on.
+// Off macOS only the tests construct `NotDetermined` and `Denied`, so a non-test build sees them as dead.
+// `allow`, not `expect`: in the test build they are used and an `expect` would go unfulfilled.
+#[cfg_attr(not(target_os = "macos"), allow(dead_code))]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum MicAuth {
     Authorized,
