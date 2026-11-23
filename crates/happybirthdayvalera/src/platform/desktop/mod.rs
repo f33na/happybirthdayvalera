@@ -2,6 +2,7 @@
 
 mod capture;
 mod model;
+mod permission;
 mod whisper;
 
 pub(crate) use capture::{Capture, open_capture};

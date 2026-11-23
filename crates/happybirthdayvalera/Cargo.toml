@@ -28,7 +28,18 @@ default = []
 # Browser capture (getUserMedia + AudioWorklet) and Whisper in a Web Worker.
 web = ["dep:wasm-bindgen", "dep:wasm-bindgen-futures", "dep:js-sys", "dep:web-sys"]
 # Native capture (cpal) and whisper.cpp (whisper-rs) with a first-run model download.
-desktop = ["dep:cpal", "dep:whisper-rs", "dep:ureq", "dep:sha2", "dep:dirs", "dep:sys-locale"]
+# On macOS it also asks AVFoundation for microphone access, because cpal gets silence when access is denied.
+desktop = [
+    "dep:cpal",
+    "dep:whisper-rs",
+    "dep:ureq",
+    "dep:sha2",
+    "dep:dirs",
+    "dep:sys-locale",
+    "dep:objc2",
+    "dep:block2",
+    "dep:objc2-av-foundation",
+]
 # Runs whisper.cpp on the GPU through Metal on Apple platforms.
 metal = ["desktop", "whisper-rs?/metal"]
 # `EvMicButton` and `EvListenerPill` over the evinvest uikit (`ev_lib::uikit_dioxus`). Needs nightly or
@@ -86,12 +97,23 @@ sha2 = { version = "0.10", optional = true }
 dirs = { version = "6", optional = true }
 sys-locale = { version = "0.3", optional = true }
 
+[target.'cfg(target_os = "macos")'.dependencies]
+objc2 = { version = "0.6", optional = true }
+block2 = { version = "0.6", optional = true }
+objc2-av-foundation = { version = "0.3", optional = true, default-features = false, features = [
+    "std",
+    "block2",
+    "AVCaptureDevice",
+    "AVMediaFormat",
+] }
+
 [dev-dependencies]
 futures-executor = "0.3"
 dioxus-ssr = "0.7.9"
 
 [lints.rust]
-unsafe_code = "forbid"
+# deny, not forbid: the macOS microphone check calls AVFoundation; only that module allows it, with SAFETY notes.
+unsafe_code = "deny"
 missing_docs = "warn"
 
 [lints.clippy]

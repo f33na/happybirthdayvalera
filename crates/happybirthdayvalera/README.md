@@ -85,6 +85,25 @@ macOS asks for microphone access on the first capture. A bundled desktop app nee
 - **Easter egg.** With `easter_egg: true`, a birthday wish in any of the four languages makes the strands
   celebrate for 3 s: the pill stays visible with the text, and both the pill and the mic get
   `data-celebrate="true"`.
+- **Microphone access (desktop).** On macOS the widget asks for access before it opens the microphone, and
+  stays in "requesting" while the system dialog is open. A refusal shows the "microphone denied" error. On
+  every desktop system, an input that delivers only exact zeros for the first 0.7 s is a failed microphone
+  (denied on macOS, unavailable elsewhere), not "Didn't catch that". A quiet room through a working
+  microphone is never bit-exact zero, so it still ends in "Didn't catch that".
+
+## Troubleshooting
+
+- **macOS says the microphone is denied, but you never saw a dialog.** macOS asks once per app and remembers
+  the answer. When `dx serve --platform desktop` launches the app, macOS often asks for the app that started
+  it, such as your terminal or editor. Open System Settings → Privacy & Security → Microphone and turn it on
+  for that app, then start the widget again.
+- **A bundled macOS app is denied without a dialog.** The bundle needs `NSMicrophoneUsageDescription` in
+  its Info.plist. With `dx` 0.7, add it to `Dioxus.toml`:
+
+  ```toml
+  [permissions]
+  microphone = { description = "Turns your speech into text on this device." }
+  ```
 
 ## Theming
 
