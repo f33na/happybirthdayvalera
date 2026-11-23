@@ -1,0 +1,87 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  # onnxruntime-node otherwise downloads its CUDA build on linux x64
+  ONNXRUNTIME_NODE_INSTALL_CUDA: skip
+
+jobs:
+  typescript:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: extractions/setup-just@v2
+      - run: npm ci
+      - run: just test-ts
+      - run: just stands-react-build
+      - name: npm pack dry run
+        run: cd packages/react && npm pack --dry-run
+
+  drift:
+    # The committed CSS, worker bundle and JSON copies must equal what their sources produce
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: extractions/setup-just@v2
+      - run: npm ci
+      - run: just check-drift
+
+  rust:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: System libraries (cpal, whisper.cpp, Dioxus desktop)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libasound2-dev cmake clang libclang-dev pkg-config \
+            libwebkit2gtk-4.1-dev libgtk-3-dev libxdo-dev libssl-dev
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
+      - uses: extractions/setup-just@v2
+      - run: just test-rust
+      - run: just test-rust-ev
+      - name: cargo publish dry run
+        run: |
+          cargo publish -p happybirthdayvalera --dry-run --features web
+          cargo publish -p happybirthdayvalera --dry-run --features desktop
+
+  dioxus-apps:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: System libraries (Dioxus desktop)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libasound2-dev cmake clang libclang-dev pkg-config \
+            libwebkit2gtk-4.1-dev libgtk-3-dev libxdo-dev libssl-dev
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
+      - uses: cargo-bins/cargo-binstall@main
+      - run: cargo binstall -y dioxus-cli@0.7.9
+      - uses: extractions/setup-just@v2
+      - name: Demo, web build
+        run: cd examples/dioxus-demo && dx build --platform web
+      - run: just stands-dioxus-build
