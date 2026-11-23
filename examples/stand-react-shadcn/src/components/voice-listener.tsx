@@ -9,10 +9,8 @@ import * as React from 'react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
-// The `--hbv-*` overrides keep the item correct when the app also imports the package stylesheet (for example
-// to use `MicButton asChild` elsewhere): that sheet is unlayered, so it would beat these utilities.
+// The package stylesheet puts its rules in `@layer components`, so these utilities win without `!`.
 const STRANDS =
-  '[--hbv-size-wave-width:72px] [--hbv-size-wave-height:28px] [--hbv-color-strand-0:var(--chart-1)] [--hbv-color-strand-1:var(--chart-2)] [--hbv-color-strand-2:var(--chart-3)] ' +
   "[&>path]:fill-none [&>path]:[stroke-linecap:round] [&>path]:[stroke-linejoin:round] [&>path[data-i='0']]:stroke-chart-1 [&>path[data-i='1']]:stroke-chart-2 [&>path[data-i='2']]:stroke-chart-3";
 
 export type VoiceListenerProps = UseListenerOptions & { className?: string };
