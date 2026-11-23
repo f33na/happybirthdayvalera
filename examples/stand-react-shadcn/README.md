@@ -1,0 +1,32 @@
+# stand-react-shadcn
+
+A "voice dictation composer" built the way a real shadcn/ui app is built, with `happybirthdayvalera` added the
+way an outside app would add it.
+
+## Run
+
+From the repository root:
+
+```sh
+just stand-react-shadcn        # builds the package, then starts the stand on http://localhost:5201
+```
+
+Open `http://localhost:5201/?mode=dark` to start in dark mode. The sun and moon button toggles `.dark` on `<html>`.
+Use Chrome or Edge for the microphone. The first dictation downloads the Whisper `base` model (about 80 MB).
+
+## What it proves
+
+- **Consumer setup.** The stand imports `happybirthdayvalera` and `happybirthdayvalera/style.css` only through the
+  package `exports`, which resolve to the built `dist`. There is no `src/` path and no alias into the package.
+- **shadcn app.** `components.json`, `@/lib/utils` and `components/ui/*` (`button`, `card`, `textarea`, `badge`,
+  `tooltip`, `tabs`) were added with the pinned `shadcn` CLI (preset `vega`, base colour `neutral`).
+- **Registry item.** `src/components/voice-listener.tsx` was installed with the real CLI from the local build:
+  `npx shadcn add <repo>/registry/public/r/voice-listener.json`. The first tab shows it.
+- **`MicButton asChild`.** The second tab uses our `MicButton` over the app's own
+  `<Button variant="outline" size="icon">`, with `theme: 'shadcn'` and `ListenerPill` mounted on `pillVisible`.
+- **Live dark mode.** The widget tokens resolve on the widget element, so toggling `.dark` recolours both paths
+  with no re-render of the widget.
+- **Dictation.** The final text of each utterance is appended to the `Textarea`. The badge shows the language.
+
+The Vite production build also proves that the Whisper worker shipped in the package is picked up by Vite:
+`vite build` emits it as `assets/whisper-worker-*.js`.
