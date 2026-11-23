@@ -3,3 +3,8 @@ name = "dioxus-demo"
 
 [web.app]
 title = "happybirthdayvalera — Dioxus demo"
+
+# dx 0.7 writes this as NSMicrophoneUsageDescription into the macOS Info.plist. Without it, macOS denies a
+# bundled app the microphone without asking.
+[permissions]
+microphone = { description = "The demo turns your speech into text on this device." }
