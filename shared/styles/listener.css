@@ -42,6 +42,7 @@
 
 .hbv-mic[aria-pressed="true"] {
   background: var(--hbv-color-mic-bg-active);
+  color: var(--hbv-color-mic-icon-active);
 }
 
 .hbv-mic[data-state="error"] .hbv-mic__icon {

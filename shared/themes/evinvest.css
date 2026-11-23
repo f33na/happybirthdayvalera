@@ -1,0 +1,29 @@
+/*
+ * Preset for hosts on @evinvest/uikit 0.36 or newer (hex tokens from styles/tokens.css; dark on :root,
+ * `.light` for light). It only maps --hbv-* tokens to the kit's variables, so it needs no Tailwind and no
+ * kit import. Every selector sits in :where(), so a host class always wins.
+ */
+:where(.hbv-mic[data-hbv-theme="evinvest"], .hbv-pill[data-hbv-theme="evinvest"]) {
+  --hbv-color-pill-bg: var(--popover);
+  --hbv-color-pill-border: var(--border);
+  --hbv-color-pill-shadow: none;
+  --hbv-color-text: var(--ink);
+  --hbv-color-text-muted: var(--ink-mid);
+  --hbv-color-error: var(--accent-error);
+  --hbv-color-strand-0: var(--chart-1);
+  --hbv-color-strand-1: var(--chart-2);
+  --hbv-color-strand-2: var(--chart-3);
+  --hbv-color-dot: var(--ink);
+  --hbv-color-chip-bg: var(--tint-neutral-fill);
+  --hbv-color-chip-bg-hover: var(--hover);
+  --hbv-color-chip-text: var(--ink);
+  --hbv-color-mic-bg: var(--secondary);
+  --hbv-color-mic-bg-hover: var(--hover);
+  --hbv-color-mic-bg-active: var(--primary);
+  --hbv-color-mic-icon: var(--ink);
+  --hbv-color-mic-icon-active: var(--on-primary);
+  --hbv-color-mic-ring: var(--ring);
+  --hbv-color-focus-ring: var(--ring);
+  --hbv-radius-chip: var(--chip-radius);
+  --hbv-font-family: var(--font-sans);
+}

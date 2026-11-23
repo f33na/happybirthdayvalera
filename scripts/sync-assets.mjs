@@ -20,7 +20,10 @@ const groups = ['color', 'size', 'radius', 'font', 'motion'];
 const vars = groups.flatMap((group) =>
   Object.entries(tokens[group]).map(([key, value]) => `  --hbv-${group}-${key}: ${value};`),
 );
-const css = `/* ${HEADER} */\n:root {\n${vars.join('\n')}\n}\n\n${read('shared/styles/listener.css')}`;
+// Tokens sit on the widget roots, not :root, so `var(--popover)` in a theme preset resolves in the host's
+// nearest scope (.dark, [data-brand], …). :where() keeps the specificity at zero for host overrides.
+const themes = ['shadcn', 'evinvest'].map((name) => read(`shared/themes/${name}.css`)).join('\n');
+const css = `/* ${HEADER} */\n:where(.hbv-mic, .hbv-pill) {\n${vars.join('\n')}\n}\n\n${read('shared/styles/listener.css')}\n${themes}`;
 write('packages/react/src/styles.css', css);
 write('crates/happybirthdayvalera/assets/listener.css', css);
 
