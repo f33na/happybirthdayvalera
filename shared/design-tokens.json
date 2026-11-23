@@ -18,6 +18,7 @@
     "mic-bg-hover": "#2f2a3b",
     "mic-bg-active": "#3b2f5c",
     "mic-icon": "#f3f0fa",
+    "mic-icon-active": "#ffffff",
     "mic-ring": "#8aa4ff",
     "focus-ring": "#b9a6ff"
   },
