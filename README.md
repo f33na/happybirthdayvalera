@@ -27,7 +27,7 @@ export function Toolbar() {
   return (
     <>
       <MicButton listener={listener} />
-      {listener.state !== 'idle' && <ListenerPill listener={listener} />}
+      {listener.pillVisible && <ListenerPill listener={listener} />}
     </>
   );
 }

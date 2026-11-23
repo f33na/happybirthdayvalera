@@ -1,0 +1,21 @@
+{
+  "$schema": "https://ui.shadcn.com/schema/registry.json",
+  "name": "happybirthdayvalera",
+  "homepage": "https://github.com/f33na/happybirthdayvalera",
+  "items": [
+    {
+      "name": "voice-listener",
+      "type": "registry:component",
+      "title": "Voice listener",
+      "description": "A voice-input widget: mic button, waveform pill and language chip. Local Whisper speech-to-text in en, ru, de and fr.",
+      "dependencies": ["happybirthdayvalera"],
+      "registryDependencies": ["button"],
+      "files": [
+        {
+          "path": "registry/voice-listener/voice-listener.tsx",
+          "type": "registry:component"
+        }
+      ]
+    }
+  ]
+}

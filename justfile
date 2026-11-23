@@ -40,6 +40,20 @@ build-ts:
 demo-react:
     npm run -w react-demo dev
 
+# A stand is a standalone consumer app of the built package, so the package is built first
+stand-react-shadcn: build-ts
+    npm run -w stand-react-shadcn dev
+
+stand-react-evinvest: build-ts
+    npm run -w stand-react-evinvest dev
+
+# Build the package, then typecheck and build both React stands
+stands-react-build: build-ts
+    npm run -w stand-react-shadcn typecheck
+    npm run -w stand-react-shadcn build
+    npm run -w stand-react-evinvest typecheck
+    npm run -w stand-react-evinvest build
+
 demo-web:
     cd examples/dioxus-demo && dx serve --platform web
 
