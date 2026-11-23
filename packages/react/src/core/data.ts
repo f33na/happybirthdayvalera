@@ -11,6 +11,7 @@ export type StringKey =
   | 'status.idle'
   | 'status.requesting'
   | 'status.loadingModel'
+  | 'status.loadingModelUnknown'
   | 'status.listening'
   | 'status.transcribing'
   | 'status.nothingHeard'

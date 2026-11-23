@@ -8,6 +8,8 @@ import { useReducedMotion } from './useReducedMotion';
 export interface WaveformProps {
   state: ListenerState;
   levelRef: { current: number };
+  /** Keeps the wave moving at the celebration amplitude. */
+  celebrating?: boolean;
   /** Added to the `<svg>` after `hbv-wave`. */
   className?: string;
   /** Added to each strand `<path>` after `hbv-wave__strand`. */
@@ -21,7 +23,7 @@ const VIEW_BOX = `0 0 ${wave.viewBoxWidth} ${wave.viewBoxHeight}`;
  * Three strands drawn from `core/wave`. The `d` attributes are written in `requestAnimationFrame` through
  * refs, so the 60 fps animation never goes through React.
  */
-export function Waveform({ state, levelRef, className, strandClassName }: WaveformProps) {
+export function Waveform({ state, levelRef, celebrating = false, className, strandClassName }: WaveformProps) {
   const paths = useRef<(SVGPathElement | null)[]>([]);
   const reduced = useReducedMotion();
 
@@ -36,11 +38,11 @@ export function Waveform({ state, levelRef, className, strandClassName }: Wavefo
     }
     const origin = performance.now();
     let frame = requestAnimationFrame(function tick(now) {
-      draw((now - origin) / 1000, amplitude(state, levelRef.current));
+      draw((now - origin) / 1000, amplitude(state, levelRef.current, false, undefined, celebrating));
       frame = requestAnimationFrame(tick);
     });
     return () => cancelAnimationFrame(frame);
-  }, [state, reduced, levelRef]);
+  }, [state, reduced, levelRef, celebrating]);
 
   return (
     <svg className={cx('hbv-wave', className)} viewBox={VIEW_BOX} aria-hidden="true">

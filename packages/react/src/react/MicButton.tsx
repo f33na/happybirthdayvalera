@@ -23,6 +23,7 @@ export interface MicButtonDomProps {
   'aria-label': string;
   'data-state': Listener['state'];
   'data-hbv-theme': Theme;
+  'data-celebrate': 'true' | 'false';
   onClick: MouseEventHandler;
 }
 
@@ -35,6 +36,7 @@ export function micButtonProps(listener: Listener, theme: Theme = listener.theme
     'aria-label': t(listener.lang, pressed ? 'action.stop' : 'action.start'),
     'data-state': listener.state,
     'data-hbv-theme': theme,
+    'data-celebrate': listener.celebrating ? 'true' : 'false',
     onClick: listener.toggle,
   };
 }

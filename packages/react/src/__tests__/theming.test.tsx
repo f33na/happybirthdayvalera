@@ -28,6 +28,7 @@ function fakeListener(patch: Partial<Listener> = {}): Listener {
     nothingHeard: false,
     langLocked: false,
     theme: 'default',
+    pillVisible: false,
     ...patch,
   };
 }

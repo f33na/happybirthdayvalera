@@ -24,8 +24,8 @@ describe('locales', () => {
   });
 
   it('fills placeholders', () => {
-    expect(t('en', 'status.loadingModel', { percent: 42 })).toBe('Downloading model 42%');
-    expect(t('fr', 'status.loadingModel', { percent: 7 })).toBe('Téléchargement du modèle 7 %');
+    expect(t('en', 'status.loadingModel', { percent: 42 })).toBe('Loading model 42%');
+    expect(t('fr', 'status.loadingModel', { percent: 7 })).toBe('Chargement du modèle 7 %');
     expect(t('de', 'action.switchLang', { lang: 'Deutsch' })).toBe('Sprache: Deutsch. Sprache wechseln');
   });
 });

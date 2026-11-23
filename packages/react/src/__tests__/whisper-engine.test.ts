@@ -129,19 +129,42 @@ describe('worker protocol', () => {
 });
 
 describe('createProgressAggregator', () => {
-  it('sums loaded and total bytes over all files and never goes down', () => {
-    const progress = createProgressAggregator();
-    expect(progress({ status: 'initiate', file: 'a' })).toBe(0);
-    expect(progress({ status: 'progress', file: 'a', loaded: 50, total: 100 })).toBe(0.5);
-    // A second file appears: the raw ratio drops to 0.25, the reported value does not.
-    expect(progress({ status: 'progress', file: 'b', loaded: 0, total: 300 })).toBe(0.5);
-    expect(progress({ status: 'progress', file: 'b', loaded: 300, total: 300 })).toBeCloseTo(350 / 400);
+  const sizes = new Map([
+    ['onnx/encoder_model_quantized.onnx', 100],
+    ['onnx/decoder_model_merged_quantized.onnx', 300],
+    ['config.json', 10],
+  ]);
+  const ENC = 'onnx/encoder_model_quantized.onnx';
+  const DEC = 'onnx/decoder_model_merged_quantized.onnx';
+
+  it('counts the two big files from the start, from the real sizes', () => {
+    const progress = createProgressAggregator(sizes);
+    expect(progress({})).toBe(0);
+    expect(progress({ status: 'progress', file: ENC, loaded: 50 })).toBeCloseTo(50 / 400);
+    expect(progress({ status: 'progress', file: DEC, loaded: 150 })).toBeCloseTo(200 / 400);
+  });
+
+  it('never goes down when a small file appears', () => {
+    const progress = createProgressAggregator(sizes);
+    progress({ status: 'progress', file: ENC, loaded: 100 });
+    const before = progress({ status: 'progress', file: DEC, loaded: 100 });
+    expect(progress({ status: 'initiate', file: 'config.json' })).toBeGreaterThanOrEqual(before ?? 0);
+  });
+
+  it('is null while any file has no known size, even if events claim 100 %', () => {
+    const progress = createProgressAggregator(new Map([[ENC, 100]]));
+    expect(progress({ status: 'progress', file: ENC, loaded: 100 })).toBeNull();
+    expect(progress({ status: 'progress', file: DEC, loaded: 5e6 })).toBeNull();
+  });
+
+  it('is null when the size list is missing (offline)', () => {
+    expect(createProgressAggregator(new Map())({ status: 'progress', file: ENC, loaded: 1 })).toBeNull();
   });
 
   it('counts a finished file as fully loaded and stays below 1', () => {
-    const progress = createProgressAggregator();
-    progress({ status: 'progress', file: 'a', loaded: 10, total: 100 });
-    expect(progress({ status: 'done', file: 'a' })).toBe(0.99);
+    const progress = createProgressAggregator(sizes);
+    progress({ status: 'done', file: ENC });
+    expect(progress({ status: 'done', file: DEC })).toBe(0.99);
   });
 });
 

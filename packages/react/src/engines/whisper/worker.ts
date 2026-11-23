@@ -25,20 +25,45 @@ let loadedModel: string | null = null;
 let transcriber: Transcriber | null = null;
 let loading: { model: string; promise: Promise<void> } | null = null;
 
+/** File sizes from the Hub's model listing. Any failure (offline, blocked) gives an empty map: progress stays unknown. */
+async function fetchFileSizes(model: string): Promise<Map<string, number>> {
+  const sizes = new Map<string, number>();
+  try {
+    const response = await fetch(`${env.remoteHost}api/models/${model}?blobs=true`, {
+      signal: AbortSignal.timeout(4000),
+    });
+    if (!response.ok) return sizes;
+    const body: unknown = await response.json();
+    const siblings = typeof body === 'object' && body !== null && 'siblings' in body ? body.siblings : null;
+    if (!Array.isArray(siblings)) return sizes;
+    for (const item of siblings as unknown[]) {
+      if (typeof item !== 'object' || item === null) continue;
+      const { rfilename, size } = item as { rfilename?: unknown; size?: unknown };
+      if (typeof rfilename === 'string' && typeof size === 'number') sizes.set(rfilename, size);
+    }
+  } catch {
+    // Unknown sizes are a normal case, see above.
+  }
+  return sizes;
+}
+
 async function load(model: string, wasmPaths?: string): Promise<void> {
   // Where onnxruntime-web fetches its .wasm and loader from; transformers.js defaults to jsDelivr.
   const wasm = env.backends.onnx.wasm;
   if (wasmPaths && wasm) wasm.wasmPaths = wasmPaths;
   if (loadedModel === model && transcriber) return;
   if (loading?.model === model) return loading.promise;
-  const aggregate = createProgressAggregator();
+  const aggregate = createProgressAggregator(await fetchFileSizes(model));
   const promise = (async () => {
     transcriber = null;
     loadedModel = null;
     const built = await pipeline('automatic-speech-recognition', model, {
       dtype: PIPELINE_DTYPE,
       device: 'wasm',
-      progress_callback: (event: object) => post({ type: 'progress', fraction: aggregate(event) }),
+      progress_callback: (event: object) => {
+        const fraction = aggregate(event);
+        post(fraction === null ? { type: 'progress' } : { type: 'progress', fraction });
+      },
     });
     // The pipeline type is a large union; this worker only uses the call signature declared above.
     transcriber = built as unknown as Transcriber;

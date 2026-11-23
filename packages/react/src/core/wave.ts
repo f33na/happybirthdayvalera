@@ -17,8 +17,11 @@ export function amplitude(
   level: number,
   reducedMotion = false,
   tokens: WaveTokens = wave,
+  celebrating = false,
 ): number {
   if (reducedMotion) return tokens.reducedMotionAmp;
+  // The celebration keeps the wave lively after the recording, when the level is 0.
+  if (celebrating) return tokens.idleAmp + (1 - tokens.idleAmp) * 0.6;
   if (state === 'listening') return tokens.idleAmp + (1 - tokens.idleAmp) * level;
   return tokens.restAmp;
 }

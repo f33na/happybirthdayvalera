@@ -6,7 +6,7 @@ export type MachineEvent =
   | { type: 'START' }
   | { type: 'MIC_READY' }
   | { type: 'MIC_FAILED'; error: ErrorCode }
-  | { type: 'MODEL_PROGRESS'; fraction: number }
+  | { type: 'MODEL_PROGRESS'; fraction: number | null }
   | { type: 'MODEL_READY' }
   | { type: 'MODEL_FAILED'; error?: ErrorCode }
   | { type: 'STOP' }
@@ -18,8 +18,8 @@ export type MachineEvent =
 export interface MachineState {
   state: ListenerState;
   error: ErrorCode | null;
-  /** Model download progress, 0..1. */
-  progress: number;
+  /** Model download progress, 0..1, or null while the size of a file is unknown. */
+  progress: number | null;
   /** The last final text, or '' while none. */
   text: string;
   /** True after a RESULT with empty text, until the next START. */
@@ -29,7 +29,7 @@ export interface MachineState {
 export const initialMachineState: MachineState = {
   state: 'idle',
   error: null,
-  progress: 0,
+  progress: null,
   text: '',
   nothingHeard: false,
 };
@@ -43,10 +43,10 @@ const to =
 // Mirrors `transitions` in shared/machine.json; the table-driven test keeps the two in step.
 const table: Partial<Record<ListenerState, Partial<Record<MachineEvent['type'], Transition>>>> = {
   idle: {
-    START: to('requesting', { error: null, progress: 0, nothingHeard: false, text: '' }),
+    START: to('requesting', { error: null, progress: null, nothingHeard: false, text: '' }),
   },
   error: {
-    START: to('requesting', { error: null, progress: 0, nothingHeard: false, text: '' }),
+    START: to('requesting', { error: null, progress: null, nothingHeard: false, text: '' }),
     RESET: to('idle', { error: null }),
   },
   requesting: {
@@ -55,7 +55,7 @@ const table: Partial<Record<ListenerState, Partial<Record<MachineEvent['type'], 
     STOP: to('idle'),
   },
   'loading-model': {
-    MODEL_PROGRESS: (s, e) => (e.type === 'MODEL_PROGRESS' ? { ...s, progress: clamp01(e.fraction) } : s),
+    MODEL_PROGRESS: (s, e) => (e.type === 'MODEL_PROGRESS' ? { ...s, progress: e.fraction === null ? null : clamp01(e.fraction) } : s),
     MODEL_READY: to('listening', { progress: 1 }),
     MODEL_FAILED: (s, e) => to('error', { error: (e.type === 'MODEL_FAILED' && e.error) || 'model-failed' })(s),
     STOP: to('idle'),

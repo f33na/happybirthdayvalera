@@ -268,7 +268,8 @@
 }
 
 @media (prefers-reduced-motion: no-preference) {
-  .hbv-pill[data-celebrate="true"] {
+  .hbv-pill[data-celebrate="true"],
+  .hbv-mic[data-celebrate="true"] {
     animation: hbv-rainbow var(--hbv-motion-celebrate-period) linear infinite;
   }
 }

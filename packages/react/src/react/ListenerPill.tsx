@@ -27,7 +27,9 @@ export function statusText(listener: Listener): string {
     case 'requesting':
       return t(lang, 'status.requesting');
     case 'loading-model':
-      return t(lang, 'status.loadingModel', { percent: Math.round(progress * 100) });
+      return progress === null
+        ? t(lang, 'status.loadingModelUnknown')
+        : t(lang, 'status.loadingModel', { percent: Math.round(progress * 100) });
     case 'listening':
       return t(lang, 'status.listening');
     case 'transcribing':
@@ -50,7 +52,7 @@ export function ListenerPill({ listener, theme, className, classNames, component
       data-celebrate={celebrating ? 'true' : 'false'}
       data-hbv-theme={theme ?? listener.theme}
     >
-      <Waveform state={state} levelRef={levelRef} className={classNames?.wave} strandClassName={classNames?.strand} />
+      <Waveform state={state} levelRef={levelRef} celebrating={celebrating} className={classNames?.wave} strandClassName={classNames?.strand} />
       <span className={cx('hbv-pill__status', classNames?.status)} aria-live="polite">
         {statusText(listener)}
       </span>

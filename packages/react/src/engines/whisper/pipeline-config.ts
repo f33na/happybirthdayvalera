@@ -24,37 +24,53 @@ export interface FileProgress {
   status?: string;
   file?: string;
   loaded?: number;
-  total?: number;
 }
 
+/** The two large files that transformers.js downloads for `PIPELINE_DTYPE` (`q8` is the `_quantized` suffix). */
+export const EXPECTED_MODEL_FILES = ['onnx/encoder_model_quantized.onnx', 'onnx/decoder_model_merged_quantized.onnx'];
+
 /**
- * Turns the per-file events of `progress_callback` into one fraction over all model files.
- * The result never goes down: a file that appears late adds to the total, and a falling bar looks broken.
+ * Turns the per-file events of `progress_callback` into one fraction over all model files, or `null` while
+ * a size is unknown. The sizes come from the Hub's file list, not from the events: a CDN that sends no
+ * `content-length` makes transformers.js report `total === loaded`, which would show 99 % for minutes.
+ * The two big model files are counted from the start, so the denominator does not jump when they begin.
+ * The value never goes down, and stays below 1 until the caller reports that the pipeline is built.
  */
-export function createProgressAggregator(): (event: FileProgress) => number {
-  const files = new Map<string, { loaded: number; total: number }>();
+export function createProgressAggregator(
+  sizes: ReadonlyMap<string, number>,
+  expected: readonly string[] = EXPECTED_MODEL_FILES,
+): (event: FileProgress) => number | null {
+  const files = new Map<string, { loaded: number; total: number | null }>();
+  const track = (file: string): { loaded: number; total: number | null } => {
+    let entry = files.get(file);
+    if (!entry) {
+      entry = { loaded: 0, total: sizes.get(file) ?? null };
+      files.set(file, entry);
+    }
+    return entry;
+  };
+  for (const file of expected) track(file);
   let best = 0;
+
   return (event) => {
-    const { file, status } = event;
-    if (file !== undefined) {
-      if (status === 'progress' && typeof event.loaded === 'number' && typeof event.total === 'number') {
-        files.set(file, { loaded: event.loaded, total: event.total });
-      } else if (status === 'done') {
-        const known = files.get(file);
-        if (known) files.set(file, { loaded: known.total, total: known.total });
-      }
+    if (event.file !== undefined) {
+      const entry = track(event.file);
+      if (event.status === 'progress' && typeof event.loaded === 'number') entry.loaded = event.loaded;
+      else if (event.status === 'done' && entry.total !== null) entry.loaded = entry.total;
     }
     let loaded = 0;
     let total = 0;
     for (const f of files.values()) {
-      loaded += f.loaded;
+      // A file of unknown size makes the whole fraction unknown. Showing a guess would be a fake percentage.
+      if (f.total === null || f.total <= 0) return null;
+      loaded += Math.min(f.loaded, f.total);
       total += f.total;
     }
-    // 0.99 at most: the caller reports 1 only after the pipeline is built.
-    if (total > 0) best = Math.max(best, Math.min(0.99, loaded / total));
+    best = Math.max(best, Math.min(0.99, loaded / total));
     return best;
   };
 }
+
 
 /** Trims and collapses whitespace in the model output. */
 export function cleanTranscript(text: string): string {

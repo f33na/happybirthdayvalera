@@ -1,8 +1,10 @@
-import { act, cleanup, renderHook, waitFor } from '@testing-library/react';
+import { act, cleanup, render, renderHook, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { SpeechEngine } from '../core/engine';
 import type * as MicModule from '../core/mic';
 import { MicError, type MicBlock } from '../core/mic';
+import { ListenerPill } from '../react/ListenerPill';
+import { MicButton } from '../react/MicButton';
 import { useListener, type UseListenerOptions } from '../react/useListener';
 
 // The microphone is replaced by a handle that the test feeds by hand.
@@ -75,6 +77,50 @@ describe('useListener', () => {
     expect(onResult).toHaveBeenCalledExactlyOnceWith('Happy birthday, Valera', 'en');
     expect(result.current.celebrating).toBe(true);
     expect(result.current.nothingHeard).toBe(false);
+  });
+
+  it('shows the celebration on the pill and the mic while the state is idle (regression)', async () => {
+    const { result } = setup({ engine: fakeEngine(), easterEgg: true });
+    act(() => result.current.start());
+    await waitFor(() => expect(result.current.state).toBe('listening'));
+    feed(0.1, 20);
+    act(() => result.current.stop());
+    await waitFor(() => expect(result.current.celebrating).toBe(true));
+
+    // A host that mounts the pill on `state !== 'idle'` would show nothing here. `pillVisible` must be true.
+    expect(result.current.state).toBe('idle');
+    expect(result.current.pillVisible).toBe(true);
+    const listener = result.current;
+    const { container } = render(
+      <>
+        {listener.pillVisible ? <ListenerPill listener={listener} /> : null}
+        <MicButton listener={listener} />
+      </>,
+    );
+    expect(container.querySelector('.hbv-pill')?.getAttribute('data-celebrate')).toBe('true');
+    expect(container.querySelector('.hbv-pill__text')?.textContent).toBe('Happy birthday, Valera');
+    expect(container.querySelector('.hbv-mic')?.getAttribute('data-celebrate')).toBe('true');
+
+    act(() => result.current.start()); // a new START ends the celebration
+    expect(result.current.celebrating).toBe(false);
+  });
+
+  it('reports an unknown progress as null', async () => {
+    const engine = fakeEngine();
+    let finish: () => void = () => undefined;
+    engine.load.mockImplementation((_m: string, onProgress: (f: number | null) => void) => {
+      onProgress(null);
+      return new Promise<void>((resolve) => (finish = resolve));
+    });
+    const { result } = setup({ engine });
+    act(() => result.current.start());
+    await waitFor(() => expect(result.current.state).toBe('loading-model'));
+    expect(result.current.progress).toBeNull();
+    await act(async () => finish());
+  });
+
+  it('keeps the pill hidden while idle and quiet', () => {
+    expect(setup({ engine: fakeEngine() }).result.current.pillVisible).toBe(false);
   });
 
   it('does not celebrate when the egg is off', async () => {

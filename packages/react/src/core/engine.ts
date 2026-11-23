@@ -3,7 +3,7 @@ import type { Lang, ModelSize } from './data';
 export type { Lang, ModelSize };
 
 export interface SpeechEngine {
-  load(model: ModelSize, onProgress: (fraction: number) => void): Promise<void>;
+  load(model: ModelSize, onProgress: (fraction: number | null) => void): Promise<void>;
   transcribe(pcm: Float32Array, lang: Lang): Promise<string>;
   dispose?(): void;
   /**

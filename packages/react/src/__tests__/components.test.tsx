@@ -26,6 +26,7 @@ function fakeListener(patch: Partial<Listener> = {}): Listener {
     nothingHeard: false,
     langLocked: false,
     theme: 'default',
+    pillVisible: false,
     ...patch,
   };
 }
@@ -97,7 +98,13 @@ describe('ListenerPill', () => {
 
   it('shows the download percent', () => {
     render(<ListenerPill listener={fakeListener({ state: 'loading-model', progress: 0.426 })} />);
-    expect(screen.getByText('Downloading model 43%')).toBeTruthy();
+    expect(screen.getByText('Loading model 43%')).toBeTruthy();
+  });
+
+  it('shows "Loading model…" and no percent while the progress is unknown', () => {
+    render(<ListenerPill listener={fakeListener({ state: 'loading-model', progress: null })} />);
+    expect(screen.getByText('Loading model…')).toBeTruthy();
+    expect(screen.queryByText(/%/)).toBeNull();
   });
 
   it('shows the error string and error state', () => {

@@ -74,7 +74,7 @@ export class ListenerController {
     engine: SpeechEngine;
     model: ModelSize;
     promise: Promise<void>;
-    sinks: Set<(f: number) => void>;
+    sinks: Set<(f: number | null) => void>;
   } | null = null;
 
   private cfg: ControllerConfig;
@@ -114,14 +114,14 @@ export class ListenerController {
     void this.ensureModel().catch(() => undefined);
   }
 
-  private ensureModel(onProgress?: (f: number) => void): Promise<void> {
+  private ensureModel(onProgress?: (f: number | null) => void): Promise<void> {
     const { engine, model } = this.config();
     if (this.loadedKey?.engine === engine && this.loadedKey.model === model) return Promise.resolve();
     if (this.loading?.engine === engine && this.loading.model === model) {
       if (onProgress) this.loading.sinks.add(onProgress);
       return this.loading.promise;
     }
-    const sinks = new Set<(f: number) => void>(onProgress ? [onProgress] : []);
+    const sinks = new Set<(f: number | null) => void>(onProgress ? [onProgress] : []);
     const promise = engine
       .load(model, (f) => sinks.forEach((sink) => sink(f)))
       .then(() => {
@@ -137,6 +137,9 @@ export class ListenerController {
   start(): void {
     if (this.snap.state !== 'idle' && this.snap.state !== 'error') return;
     const id = ++this.session;
+    // A new START ends the celebration.
+    if (this.celebrateTimer) clearTimeout(this.celebrateTimer);
+    this.celebrateTimer = null;
     this.update({ interim: '', celebrating: false });
     this.dispatch({ type: 'START' });
     this.levelRef.current = 0;

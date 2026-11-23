@@ -43,8 +43,8 @@ export interface UseListenerOptions {
 export interface Listener {
   state: ListenerState;
   error: ErrorCode | null;
-  /** Model download progress, 0..1. */
-  progress: number;
+  /** Model load progress, 0..1, or null while a file size is unknown. */
+  progress: number | null;
   /** The last final text. */
   text: string;
   /** Partial text while listening. */
@@ -64,6 +64,8 @@ export interface Listener {
   /** True while `lang` is forced; the chip is hidden then. */
   langLocked: boolean;
   theme: Theme;
+  /** `state !== 'idle' || nothingHeard || celebrating`. Mount the pill on this, or the easter egg stays hidden. */
+  pillVisible: boolean;
 }
 
 function createEngine(choice: 'whisper' | 'webspeech', wasmPaths: string | undefined): SpeechEngine {
@@ -79,7 +81,7 @@ function subscribeLanguages(onChange: () => void): () => void {
 const SERVER_SNAPSHOT: Snapshot = {
   state: 'idle',
   error: null,
-  progress: 0,
+  progress: null,
   text: '',
   nothingHeard: false,
   interim: '',
@@ -167,5 +169,6 @@ export function useListener(options: UseListenerOptions = {}): Listener {
     nothingHeard: snap.nothingHeard,
     langLocked: forcedLang !== undefined,
     theme,
+    pillVisible: snap.state !== 'idle' || snap.nothingHeard || snap.celebrating,
   };
 }

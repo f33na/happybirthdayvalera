@@ -35,7 +35,7 @@ export function whisperEngine(options: WhisperEngineOptions = {}): SpeechEngine 
   let loadedModel: ModelSize | null = null;
   let nextId = 1;
   const pending = new Map<number, Pending>();
-  let loadWaiter: { resolve: () => void; reject: (e: Error) => void; onProgress: (f: number) => void } | null = null;
+  let loadWaiter: { resolve: () => void; reject: (e: Error) => void; onProgress: (f: number | null) => void } | null = null;
 
   const failAll = (error: Error): void => {
     for (const p of pending.values()) p.reject(error);
@@ -58,7 +58,7 @@ export function whisperEngine(options: WhisperEngineOptions = {}): SpeechEngine 
       if (!isWorkerResponse(message)) return;
       switch (message.type) {
         case 'progress':
-          loadWaiter?.onProgress(message.fraction);
+          loadWaiter?.onProgress(message.fraction ?? null);
           break;
         case 'ready':
           loadWaiter?.resolve();
