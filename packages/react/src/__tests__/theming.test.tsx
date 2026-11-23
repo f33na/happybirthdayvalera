@@ -1,3 +1,4 @@
+import { buttonVariants } from '@evinvest/uikit';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { createRef } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -207,6 +208,13 @@ describe('evinvest adapter', () => {
     expect(button.classList.contains('shrink-0')).toBe(true); // from the kit's buttonVariants
     fireEvent.click(button);
     expect(listener.toggle).toHaveBeenCalledOnce();
+  });
+
+  it('uses the kit primary variant while active, and the chosen variant while idle', () => {
+    const idle = render(<EvMicButton listener={fakeListener({ state: 'idle' })} />).container.querySelector('button');
+    const active = render(<EvMicButton listener={fakeListener({ state: 'listening' })} />).container.querySelector('button');
+    expect(idle?.className).not.toBe(active?.className);
+    expect(active?.className).toContain(buttonVariants({ variant: 'primary', size: 'md', icon: true }));
   });
 
   it('renders the pill with the kit Badge over a native language button', () => {

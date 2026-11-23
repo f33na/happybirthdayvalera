@@ -5,7 +5,7 @@
 import { Badge, buttonVariants, cn, type ButtonSize, type ButtonVariant } from '@evinvest/uikit';
 import { forwardRef } from 'react';
 import { ListenerPill, type LangButtonProps, type ListenerPillProps } from '../react/ListenerPill';
-import { MicButton, type MicButtonProps } from '../react/MicButton';
+import { MicButton, micButtonProps, type MicButtonProps } from '../react/MicButton';
 
 export interface EvMicButtonProps extends Omit<MicButtonProps, 'asChild' | 'children' | 'theme'> {
   variant?: ButtonVariant;
@@ -20,12 +20,15 @@ export const EvMicButton = forwardRef<HTMLButtonElement, EvMicButtonProps>(funct
   { variant = 'secondary', size = 'md', className, ...rest },
   ref,
 ) {
+  // The widget stylesheet sits in `@layer components`, so the kit's classes win on every property they set,
+  // including the background. The active state therefore has to come from the kit too: the primary variant.
+  const pressed = micButtonProps(rest.listener, 'evinvest')['aria-pressed'];
   return (
     <MicButton
       ref={ref}
       {...rest}
       theme="evinvest"
-      className={cn(buttonVariants({ variant, size, icon: true }), className)}
+      className={cn(buttonVariants({ variant: pressed ? 'primary' : variant, size, icon: true }), className)}
     />
   );
 });
