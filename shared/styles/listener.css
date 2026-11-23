@@ -165,13 +165,12 @@
 }
 
 .hbv-pill__status {
-  min-inline-size: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  flex-shrink: 0;
   white-space: nowrap;
 }
 
 .hbv-pill__text {
+  flex: 0 1 auto;
   min-inline-size: 0;
   max-inline-size: calc(var(--hbv-size-wave-width) * 4);
   overflow: hidden;
@@ -258,6 +257,17 @@
 
 .hbv-lang:hover {
   background: var(--hbv-color-chip-bg-hover);
+}
+
+/* A chip button inside a host badge: the badge owns the look, so the button resets to plain text. */
+.hbv-lang--bare,
+.hbv-lang--bare:hover {
+  block-size: auto;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
 }
 
 /* ---------- Easter egg ---------- */

@@ -243,6 +243,30 @@ describe('generated stylesheet', () => {
     }
   });
 
+  it('starts with the Tailwind v4 layer order statement, right after the header', () => {
+    const lines = css.split('\n');
+    expect(lines[0]).toMatch(/^\/\* GENERATED /);
+    expect(lines[1]).toBe('@layer theme, base, components, utilities;');
+  });
+
+  it('puts every widget rule, presets included, in one components layer', () => {
+    const body = css.split('\n').slice(2).join('\n').trim();
+    expect(body.startsWith('@layer components {')).toBe(true);
+    expect(body.endsWith('}')).toBe(true);
+    // A single top-level layer block: no rule outside it, so utilities and unlayered host CSS always win.
+    expect(css.match(/^@layer /gm)).toHaveLength(2);
+    expect(css.indexOf('[data-hbv-theme="evinvest"]')).toBeGreaterThan(css.indexOf('@layer components {'));
+  });
+
+  it('keeps the status unshrinkable and the bare chip reset', () => {
+    expect(css).toMatch(/\.hbv-pill__status \{\s*flex-shrink: 0;/);
+    expect(css).toMatch(/\.hbv-pill__text \{\s*flex: 0 1 auto;/);
+    const bare = /\.hbv-lang--bare,\s*\.hbv-lang--bare:hover \{([^}]*)\}/.exec(css)?.[1] ?? '';
+    for (const decl of ['padding: 0;', 'border: 0;', 'background: transparent;', 'color: inherit;', 'font: inherit;']) {
+      expect(bare).toContain(decl);
+    }
+  });
+
   it('keeps the crate asset byte-identical', () => {
     const asset = fs.readFileSync(
       path.resolve(process.cwd(), '../../crates/happybirthdayvalera/assets/listener.css'),

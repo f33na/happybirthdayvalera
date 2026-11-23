@@ -23,7 +23,9 @@ const vars = groups.flatMap((group) =>
 // Tokens sit on the widget roots, not :root, so `var(--popover)` in a theme preset resolves in the host's
 // nearest scope (.dark, [data-brand], …). :where() keeps the specificity at zero for host overrides.
 const themes = ['shadcn', 'evinvest'].map((name) => read(`shared/themes/${name}.css`)).join('\n');
-const css = `/* ${HEADER} */\n:where(.hbv-mic, .hbv-pill) {\n${vars.join('\n')}\n}\n\n${read('shared/styles/listener.css')}\n${themes}`;
+// Tailwind v4's own order statement comes first, so utilities beat the widget and preflight cannot reset it,
+// whatever the import order. Everything below is in one `components` layer.
+const css = `/* ${HEADER} */\n@layer theme, base, components, utilities;\n\n@layer components {\n:where(.hbv-mic, .hbv-pill) {\n${vars.join('\n')}\n}\n\n${read('shared/styles/listener.css')}\n${themes}\n}\n`;
 write('packages/react/src/styles.css', css);
 write('crates/happybirthdayvalera/assets/listener.css', css);
 
