@@ -75,11 +75,17 @@ type ModelSize = 'tiny' | 'base' | 'small';
 interface SpeechEngine {
   load(model: ModelSize, onProgress: (fraction: number) => void): Promise<void>;
   transcribe(pcm: Float32Array, lang: Lang): Promise<string>;
+  begin?(lang: Lang): void; // called on entering `listening`; for engines that capture audio themselves
   dispose?(): void;
 }
 ```
 
-Rust has the same trait with async methods. Whisper always gets the language as a forced token, with task
+An engine that captures its own audio, such as the Web Speech API, starts in `begin` and ignores `pcm` in
+`transcribe`. `MODEL_FAILED` may carry an error code, for example `unsupported`; without one it means
+`model-failed`. If the VAD never saw speech, or the audio is under 0.3 s, the controller does not call the
+engine and sends an empty `RESULT`. This stops Whisper from inventing text from silence.
+
+Rust has the same trait with async methods. `begin` is optional there too (a default no-op). Whisper always gets the language as a forced token, with task
 `transcribe`, not `translate`. The engine trims the result.
 
 Model ids are in `behavior.json` → `models`. Desktop checks the SHA-256 of a downloaded `ggml-*.bin` against
@@ -93,7 +99,7 @@ npm package and the Dioxus web build (`crates/happybirthdayvalera/assets/whisper
 Main → worker:
 
 ```ts
-{ type: 'load', model: 'onnx-community/whisper-base' }
+{ type: 'load', model: 'onnx-community/whisper-base', wasmPaths?: string } // wasmPaths: onnxruntime wasm base URL; default is the CDN
 { type: 'transcribe', id: number, pcm: Float32Array, lang: Lang }   // pcm buffer is transferred
 ```
 
@@ -116,7 +122,9 @@ TypeScript:
 const listener = useListener({ lang?, persistLang?, engine?, model?, onResult?, onInterim?,
                                interimEveryMs?, silenceMs?, easterEgg?, preload?, theme? });
 // listener: { state, error, progress, text, interim, lang, setLang, cycleLang,
-//             start, stop, toggle, reset, celebrating, levelRef, theme }
+//             start, stop, toggle, reset, celebrating, levelRef, theme,
+//             nothingHeard, langLocked }
+// nothingHeard: the last RESULT was empty, until the next START. langLocked: `lang` is forced; hide the chip.
 <MicButton listener={listener} theme? className? classNames? asChild? />
 <ListenerPill listener={listener} theme? className? classNames? components? />
 ```
