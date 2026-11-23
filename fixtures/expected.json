@@ -1,0 +1,7 @@
+{
+  "$comment": "Recognition fixtures, made by make.sh. A test transcribes <lang>.wav with the language forced and checks that the lowercased text (ё→е) contains every key word. Every phrase also triggers the easter egg.",
+  "en": { "text": "Happy birthday, Valera. The weather is lovely today.", "keywords": ["birthday", "weather"] },
+  "ru": { "text": "С днём рождения, Валера. Сегодня прекрасная погода.", "keywords": ["рождения", "погода"] },
+  "de": { "text": "Alles Gute zum Geburtstag, Valera. Heute ist das Wetter schön.", "keywords": ["geburtstag", "wetter"] },
+  "fr": { "text": "Joyeux anniversaire, Valera. Il fait très beau aujourd'hui.", "keywords": ["anniversaire", "beau"] }
+}
