@@ -24,6 +24,8 @@ pub use i18n::{Msg, format as t};
 pub use lang::{Lang, resolve_preferred_lang};
 pub use listener::{Listener, ListenerConfig, TextHandler, status_text, use_listener};
 pub use machine::{ErrorCode, Event, State};
+#[cfg(all(feature = "web", any(target_arch = "wasm32", not(feature = "desktop"))))]
+pub use platform::WorkerEngine;
 #[cfg(all(feature = "desktop", not(target_arch = "wasm32")))]
 pub use platform::{ModelStore, WhisperEngine};
 pub use theme::{MicClassNames, PillClassNames, Theme};
