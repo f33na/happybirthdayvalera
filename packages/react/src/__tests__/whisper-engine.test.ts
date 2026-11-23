@@ -112,6 +112,21 @@ describe('whisperEngine', () => {
   });
 });
 
+describe('createProgressAggregator with self-hosted sizes', () => {
+  const sizes = new Map([
+    ['onnx/encoder_model_quantized.onnx', 100],
+    ['onnx/decoder_model_merged_quantized.onnx', 100],
+  ]);
+
+  // Known bug (found live in a browser): a small file that has no HEAD size makes the fraction unknown for good.
+  // Remove `.fails` with the fix.
+  it('keeps a real fraction after an event for a file that has no known size', () => {
+    const aggregate = createProgressAggregator(sizes);
+    aggregate({ status: 'initiate', file: 'config.json' });
+    expect(aggregate({ status: 'progress', file: 'onnx/encoder_model_quantized.onnx', loaded: 100 })).toBe(0.5);
+  });
+});
+
 describe('worker protocol', () => {
   it('accepts exactly the contract messages', () => {
     expect(isWorkerResponse({ type: 'progress', fraction: 0.1 })).toBe(true);

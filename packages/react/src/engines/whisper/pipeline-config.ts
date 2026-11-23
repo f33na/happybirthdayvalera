@@ -31,9 +31,12 @@ export const EXPECTED_MODEL_FILES = ['onnx/encoder_model_quantized.onnx', 'onnx/
 
 /**
  * Turns the per-file events of `progress_callback` into one fraction over all model files, or `null` while
- * a size is unknown. The sizes come from the Hub's file list (or from `HEAD` requests when the models are self-hosted), not from the events: a CDN that sends no
- * `content-length` makes transformers.js report `total === loaded`, which would show 99 % for minutes.
+ * a size is unknown. The sizes come from the Hub's file list, or from `HEAD` requests when the models are
+ * self-hosted, not from the events: a CDN that sends no `content-length` makes transformers.js report
+ * `total === loaded`, which would show 99 % for minutes.
  * The two big model files are counted from the start, so the denominator does not jump when they begin.
+ * Any other file counts only when its size is known. The self-hosted path has sizes for the two big files
+ * only, and the small config and tokenizer files would otherwise keep the fraction unknown to the end.
  * The value never goes down, and stays below 1 until the caller reports that the pipeline is built.
  */
 export function createProgressAggregator(
@@ -53,7 +56,7 @@ export function createProgressAggregator(
   let best = 0;
 
   return (event) => {
-    if (event.file !== undefined) {
+    if (event.file !== undefined && (files.has(event.file) || sizes.has(event.file))) {
       const entry = track(event.file);
       if (event.status === 'progress' && typeof event.loaded === 'number') entry.loaded = event.loaded;
       else if (event.status === 'done' && entry.total !== null) entry.loaded = entry.total;
