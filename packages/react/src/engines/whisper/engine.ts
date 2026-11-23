@@ -10,6 +10,11 @@ export interface WhisperEngineOptions {
   workerUrl?: string | URL;
   /** Full control: return your own module worker. Wins over `workerUrl`. */
   createWorker?: () => Worker;
+  /**
+   * Base URL that serves the onnxruntime-web `.wasm` and `.mjs` files (from `@huggingface/transformers/dist`).
+   * Default: the jsDelivr CDN. Set it, and cache the model files, for a fully offline app.
+   */
+  wasmPaths?: string;
 }
 
 /**
@@ -103,7 +108,7 @@ export function whisperEngine(options: WhisperEngineOptions = {}): SpeechEngine 
           onProgress,
         };
         try {
-          send({ type: 'load', model: behavior.models.web[model] });
+          send({ type: 'load', model: behavior.models.web[model], wasmPaths: options.wasmPaths });
         } catch (error) {
           loadWaiter = null;
           reject(error instanceof Error ? error : new EngineError('model-failed', String(error)));

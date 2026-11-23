@@ -25,7 +25,9 @@ let loadedModel: string | null = null;
 let transcriber: Transcriber | null = null;
 let loading: { model: string; promise: Promise<void> } | null = null;
 
-async function load(model: string): Promise<void> {
+async function load(model: string, wasmPaths?: string): Promise<void> {
+  // Where onnxruntime-web fetches its .wasm and loader from; transformers.js defaults to jsDelivr.
+  if (wasmPaths) env.backends.onnx.wasm.wasmPaths = wasmPaths;
   if (loadedModel === model && transcriber) return;
   if (loading?.model === model) return loading.promise;
   const aggregate = createProgressAggregator();
@@ -65,7 +67,7 @@ self.onmessage = (event: MessageEvent<WorkerRequest>) => {
   queue = queue.then(async () => {
     try {
       if (request.type === 'load') {
-        await load(request.model);
+        await load(request.model, request.wasmPaths);
         post({ type: 'ready' });
       } else {
         await transcribe(request.id, request.pcm, request.lang);
