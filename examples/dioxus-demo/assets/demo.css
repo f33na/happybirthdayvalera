@@ -59,9 +59,15 @@ body {
   position: fixed;
   inset: auto 0 0 0;
   display: flex;
+  flex-wrap: wrap;
   justify-content: center;
   align-items: center;
   gap: 12px;
   padding: 16px;
   background: linear-gradient(to top, #0e0c14 60%, transparent);
+}
+
+/* On a narrow screen a long celebration text must shrink the pill, not push the mic off-screen. */
+.demo__toolbar > .hbv-pill {
+  min-inline-size: 0;
 }
