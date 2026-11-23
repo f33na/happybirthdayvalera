@@ -1,0 +1,12 @@
+{
+  "name": "happybirthdayvalera-workspace",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "packages/react",
+    "examples/react-demo"
+  ],
+  "engines": {
+    "node": ">=20"
+  }
+}
