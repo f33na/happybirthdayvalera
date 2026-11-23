@@ -14,9 +14,10 @@ just stand-dioxus-evinvest      # dx serve on http://localhost:8202
 just stands-dioxus-build        # dx build of both stands, then clippy
 ```
 
-`ev_lib` 0.34 and `ev_lib_classes` 0.20 turn on the nightly-only `default_field_values` feature. The
-recipes set `RUSTC_BOOTSTRAP=1`, so the stable toolchain builds them. Without it, the build fails with
-E0554. The real `listener.css` and `whisper-worker.js` come from `just sync-assets`.
+`ev_lib` 0.34 and `ev_lib_classes` 0.20 turn on the nightly-only `#![feature(default_field_values)]`,
+so the `ev_uikit` feature of the crate needs a nightly toolchain or `RUSTC_BOOTSTRAP=1`. The recipes set
+`RUSTC_BOOTSTRAP=1`, so the stable toolchain builds them. Without it, the build fails with E0554. This
+stays so until EV-Main/web_std drops that feature from both crates. The real `listener.css` and `whisper-worker.js` come from `just sync-assets`.
 
 ## What it proves
 

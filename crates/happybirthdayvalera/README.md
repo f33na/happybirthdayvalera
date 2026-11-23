@@ -36,7 +36,16 @@ The crate does not enable a Dioxus renderer; your app does. Pick the feature tha
 | `web` | `getUserMedia` and an `AudioWorklet` that resamples to 16 kHz | Whisper (transformers.js) in a module Web Worker |
 | `desktop` | `cpal`, resampled to 16 kHz on a capture thread | whisper.cpp through `whisper-rs` on a worker thread |
 | `metal` | | `desktop` with whisper.cpp on the GPU (Apple) |
-| `ev_uikit` | | `EvMicButton` and `EvListenerPill` over the evinvest uikit |
+| `ev_uikit` | | `EvMicButton` and `EvListenerPill` over the evinvest uikit (needs nightly, see below) |
+
+`ev_uikit` needs a nightly toolchain, or `RUSTC_BOOTSTRAP=1` on stable. Its dependencies `ev_lib` 0.34 and
+`ev_lib_classes` 0.20 turn on the nightly-only `#![feature(default_field_values)]`, so a stable build fails
+with E0554. This stays so until EV-Main/web_std drops that feature from both crates. The other features
+build on stable.
+
+The docs on docs.rs are built with `web` and `ev_uikit`. The docs.rs image has no ALSA or webkit
+libraries, so the `desktop` items (`WhisperEngine`, `ModelStore`) are not there; run
+`cargo doc --features desktop` to see them.
 
 A typical app maps its own features to both:
 

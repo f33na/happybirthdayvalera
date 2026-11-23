@@ -18,6 +18,11 @@ include = [
     "/shared/*.json",
 ]
 
+# docs.rs runs nightly, which ev_uikit needs, but its image has no ALSA, so cpal (desktop) cannot build there.
+# With web on a native target, the web adapter compiles, so the docs show WorkerEngine and the ev components.
+[package.metadata.docs.rs]
+features = ["web", "ev_uikit"]
+
 [features]
 default = []
 # Browser capture (getUserMedia + AudioWorklet) and Whisper in a Web Worker.
@@ -26,7 +31,8 @@ web = ["dep:wasm-bindgen", "dep:wasm-bindgen-futures", "dep:js-sys", "dep:web-sy
 desktop = ["dep:cpal", "dep:whisper-rs", "dep:ureq", "dep:sha2", "dep:dirs", "dep:sys-locale"]
 # Runs whisper.cpp on the GPU through Metal on Apple platforms.
 metal = ["desktop", "whisper-rs?/metal"]
-# `EvMicButton` and `EvListenerPill` over the evinvest uikit (`ev_lib::uikit_dioxus`).
+# `EvMicButton` and `EvListenerPill` over the evinvest uikit (`ev_lib::uikit_dioxus`). Needs nightly or
+# RUSTC_BOOTSTRAP=1: ev_lib 0.34 and ev_lib_classes 0.20 use #![feature(default_field_values)].
 ev_uikit = ["dep:ev_lib"]
 
 [dependencies]
