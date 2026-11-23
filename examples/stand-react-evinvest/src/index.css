@@ -1,0 +1,6 @@
+@import "tailwindcss";
+@import "@evinvest/uikit/styles/tokens.css";
+
+/* Tailwind does not scan node_modules, so the kit's compiled components need an explicit source.
+   The kit is hoisted to the workspace root here; in a standalone app this is "../node_modules/@evinvest/uikit/dist". */
+@source "../../../node_modules/@evinvest/uikit/dist";
