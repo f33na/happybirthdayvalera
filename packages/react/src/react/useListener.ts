@@ -6,6 +6,7 @@ import { detectLang, nextLang, persistLang as storeLang } from '../core/lang';
 import type { ErrorCode, ListenerState } from '../core/machine';
 import { webSpeechEngine } from '../engines/webspeech/engine';
 import { whisperEngine } from '../engines/whisper/engine';
+import type { Theme } from './slots';
 
 export type EngineChoice = 'whisper' | 'webspeech' | SpeechEngine;
 
@@ -30,6 +31,13 @@ export interface UseListenerOptions {
   easterEgg?: boolean;
   /** Start loading the model on mount instead of on the first tap. Default false. */
   preload?: boolean;
+  /** Look preset, rendered as `data-hbv-theme`. Default `'default'`. */
+  theme?: Theme;
+  /**
+   * Where the onnxruntime `.wasm` files are served from (the default Whisper engine only).
+   * Default: the jsDelivr CDN. Set it for a fully offline app.
+   */
+  wasmPaths?: string;
 }
 
 export interface Listener {
@@ -55,10 +63,11 @@ export interface Listener {
   nothingHeard: boolean;
   /** True while `lang` is forced; the chip is hidden then. */
   langLocked: boolean;
+  theme: Theme;
 }
 
-function createEngine(choice: 'whisper' | 'webspeech'): SpeechEngine {
-  return choice === 'webspeech' ? webSpeechEngine() : whisperEngine();
+function createEngine(choice: 'whisper' | 'webspeech', wasmPaths: string | undefined): SpeechEngine {
+  return choice === 'webspeech' ? webSpeechEngine() : whisperEngine({ wasmPaths });
 }
 
 function subscribeLanguages(onChange: () => void): () => void {
@@ -87,6 +96,8 @@ export function useListener(options: UseListenerOptions = {}): Listener {
     silenceMs = behavior.silenceMs,
     easterEgg = false,
     preload = false,
+    theme = 'default',
+    wasmPaths,
   } = options;
 
   // `navigator` does not exist on the server, so the server snapshot is `en` and the client corrects it after hydration.
@@ -95,8 +106,8 @@ export function useListener(options: UseListenerOptions = {}): Listener {
   const lang = forcedLang ?? chosen ?? detected;
 
   const engine = useMemo(
-    () => (typeof engineChoice === 'string' ? createEngine(engineChoice) : engineChoice),
-    [engineChoice],
+    () => (typeof engineChoice === 'string' ? createEngine(engineChoice, wasmPaths) : engineChoice),
+    [engineChoice, wasmPaths],
   );
   // Engines made here are ours to dispose; a user-supplied one is not.
   const ownsEngine = typeof engineChoice === 'string';
@@ -155,5 +166,6 @@ export function useListener(options: UseListenerOptions = {}): Listener {
     levelRef: controller.levelRef,
     nothingHeard: snap.nothingHeard,
     langLocked: forcedLang !== undefined,
+    theme,
   };
 }

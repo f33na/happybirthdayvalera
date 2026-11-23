@@ -1,10 +1,21 @@
+import type { ButtonHTMLAttributes, ComponentType } from 'react';
 import { t, errorKey, langName, langShort } from '../core/i18n';
+import { cx, type PillClassNames, type Theme } from './slots';
 import type { Listener } from './useListener';
 import { Waveform } from './Waveform';
 
+/** Props that the pill passes to the language button. A host component must spread them on one element. */
+export type LangButtonProps = ButtonHTMLAttributes<HTMLButtonElement>;
+
 export interface ListenerPillProps {
   listener: Listener;
+  /** Overrides `listener.theme` for this component. */
+  theme?: Theme;
   className?: string;
+  /** Classes for the parts, added after the contract class names. */
+  classNames?: PillClassNames;
+  /** Replace parts with your own components, for example the language chip. */
+  components?: { LangButton?: ComponentType<LangButtonProps> };
 }
 
 function statusText(listener: Listener): string {
@@ -25,36 +36,38 @@ function statusText(listener: Listener): string {
   }
 }
 
-export function ListenerPill({ listener, className }: ListenerPillProps) {
+export function ListenerPill({ listener, theme, className, classNames, components }: ListenerPillProps) {
   const { state, lang, levelRef, celebrating, langLocked, interim, text } = listener;
   const shown = state === 'listening' || state === 'transcribing' ? interim : text;
+  const LangButton = components?.LangButton ?? 'button';
   return (
     <div
-      className={className ? `hbv-pill ${className}` : 'hbv-pill'}
+      className={cx('hbv-pill', className, classNames?.root)}
       role="group"
       aria-label={t(lang, 'label.widget')}
       data-state={state}
       data-celebrate={celebrating ? 'true' : 'false'}
+      data-hbv-theme={theme ?? listener.theme}
     >
-      <Waveform state={state} levelRef={levelRef} />
-      <span className="hbv-pill__status" aria-live="polite">
+      <Waveform state={state} levelRef={levelRef} className={classNames?.wave} strandClassName={classNames?.strand} />
+      <span className={cx('hbv-pill__status', classNames?.status)} aria-live="polite">
         {statusText(listener)}
       </span>
-      {shown ? <span className="hbv-pill__text">{shown}</span> : null}
-      <span className="hbv-dots" aria-hidden="true">
+      {shown ? <span className={cx('hbv-pill__text', classNames?.text)}>{shown}</span> : null}
+      <span className={cx('hbv-dots', classNames?.dots)} aria-hidden="true">
         <i />
         <i />
         <i />
       </span>
       {langLocked ? null : (
-        <button
+        <LangButton
           type="button"
-          className="hbv-lang"
+          className={cx('hbv-lang', classNames?.lang)}
           aria-label={t(lang, 'action.switchLang', { lang: langName(lang) })}
           onClick={listener.cycleLang}
         >
           {langShort(lang)}
-        </button>
+        </LangButton>
       )}
     </div>
   );

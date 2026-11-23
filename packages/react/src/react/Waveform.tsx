@@ -2,11 +2,16 @@ import { useEffect, useRef } from 'react';
 import { wave } from '../core/data';
 import type { ListenerState } from '../core/machine';
 import { amplitude, strandPath } from '../core/wave';
+import { cx } from './slots';
 import { useReducedMotion } from './useReducedMotion';
 
 export interface WaveformProps {
   state: ListenerState;
   levelRef: { current: number };
+  /** Added to the `<svg>` after `hbv-wave`. */
+  className?: string;
+  /** Added to each strand `<path>` after `hbv-wave__strand`. */
+  strandClassName?: string;
 }
 
 const STRANDS = wave.strands.map((_, i) => i);
@@ -16,7 +21,7 @@ const VIEW_BOX = `0 0 ${wave.viewBoxWidth} ${wave.viewBoxHeight}`;
  * Three strands drawn from `core/wave`. The `d` attributes are written in `requestAnimationFrame` through
  * refs, so the 60 fps animation never goes through React.
  */
-export function Waveform({ state, levelRef }: WaveformProps) {
+export function Waveform({ state, levelRef, className, strandClassName }: WaveformProps) {
   const paths = useRef<(SVGPathElement | null)[]>([]);
   const reduced = useReducedMotion();
 
@@ -38,14 +43,14 @@ export function Waveform({ state, levelRef }: WaveformProps) {
   }, [state, reduced, levelRef]);
 
   return (
-    <svg className="hbv-wave" viewBox={VIEW_BOX} aria-hidden="true">
+    <svg className={cx('hbv-wave', className)} viewBox={VIEW_BOX} aria-hidden="true">
       {STRANDS.map((i) => (
         <path
           key={i}
           ref={(el) => {
             paths.current[i] = el;
           }}
-          className="hbv-wave__strand"
+          className={cx('hbv-wave__strand', strandClassName)}
           data-i={i}
           // Initial frame, so server markup and the first paint already show a wave.
           d={strandPath(i, 0, wave.restAmp)}

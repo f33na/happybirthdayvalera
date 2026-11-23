@@ -25,6 +25,7 @@ function fakeListener(patch: Partial<Listener> = {}): Listener {
     levelRef: { current: 0 },
     nothingHeard: false,
     langLocked: false,
+    theme: 'default',
     ...patch,
   };
 }
