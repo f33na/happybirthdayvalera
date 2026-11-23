@@ -63,6 +63,33 @@ fn Toolbar() -> Element {
 
 The shared contract for both libraries is in [`shared/CONTRACT.md`](shared/CONTRACT.md).
 
+## Fit it into your design system
+
+The widget has three layers. Use the first one that is enough:
+
+1. **A theme preset.** `theme: 'shadcn'` or `theme: 'evinvest'` maps the widget onto the CSS variables of
+   [shadcn/ui](https://ui.shadcn.com/) or [`@evinvest/uikit`](https://www.npmjs.com/package/@evinvest/uikit).
+   It is pure CSS, and it follows the host's light and dark scopes.
+2. **Slots and your own button.** Every part takes a class. In React, `MicButton asChild` wraps your own
+   button, for example a shadcn `<Button variant="outline" size="icon">`. The widget CSS lives in
+   `@layer components`, so Tailwind utilities override it without `!`.
+3. **Native adapters.**
+   - `happybirthdayvalera/evinvest` for React on `@evinvest/uikit`.
+   - The cargo feature `ev_uikit` for Dioxus on `ev_lib` with `uikit_dioxus`. It needs nightly or
+     `RUSTC_BOOTSTRAP=1` for now, because `ev_lib` 0.34 uses an unstable language feature.
+   - A shadcn registry item in [`registry/`](registry), for `npx shadcn add`.
+
+## Stands
+
+A stand is a small dictation app that uses the published API with one kit, as an outside app would:
+
+| Stand | Command | Port |
+| --- | --- | --- |
+| React + shadcn/ui | `just stand-react-shadcn` | 5201 |
+| React + `@evinvest/uikit` | `just stand-react-evinvest` | 5202 |
+| Dioxus web + shadcn/ui look | `just stand-dioxus-shadcn` | 8201 |
+| Dioxus web + `ev_lib` uikit | `just stand-dioxus-evinvest` | 8202 |
+
 ## Development
 
 You need node 22, a Rust toolchain, `dx` 0.7, `cmake` and `just`.
@@ -70,6 +97,8 @@ You need node 22, a Rust toolchain, `dx` 0.7, `cmake` and `just`.
 ```sh
 just            # list recipes
 just test       # TypeScript and Rust unit tests
+just test-rust-ev   # the ev_uikit adapter (uses RUSTC_BOOTSTRAP)
+just test-accuracy  # Whisper over the fixtures; downloads the models once
 just demo-react # Vite demo
 just demo-web   # Dioxus web demo
 just demo-desktop
