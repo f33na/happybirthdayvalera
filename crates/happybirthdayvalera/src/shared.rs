@@ -62,7 +62,10 @@ pub(crate) struct BehaviorFile {
     pub min_speech_ms: u32,
     pub silence_ms: u32,
     pub max_duration_ms: u32,
+    pub interim_every_ms: u32,
+    pub easter_egg_ms: u32,
     pub lang_cycle: Vec<String>,
+    pub persist_lang_key: String,
     pub models: Models,
 }
 
