@@ -129,6 +129,8 @@ mod ev {
         let class = html.split(r#"class=""#).nth(1).and_then(|rest| rest.split('"').next()).unwrap();
         assert!(class.contains("bg-secondary"), "the kit classes come first: {class}");
         assert!(class.ends_with("hbv-mic host-x"), "contract class, then host classes: {class}");
+        // Square: the widget size follows the kit's control box, which the kit's height utility also uses.
+        assert!(html.contains(r#"style="--hbv-level: 0; --hbv-size-mic: var(--control-box)""#), "{html}");
         assert!(html.contains("hbv-mic__ring") && html.contains("hbv-mic__icon"), "{html}");
     }
 

@@ -25,9 +25,9 @@ placeholders, the page renders, but the pill reports a model error.
 - `Theme::Shadcn` maps the `--hbv-*` tokens to the shadcn variables (`--popover`, `--secondary`,
   `--chart-1` and so on). The dark mode switch sets `.dark` on a wrapper, so the widget recolours live,
   with no re-render.
-- `class` and `class_names` reach the right elements. `listener.css` is not in a cascade layer, and
-  Tailwind v4 puts utilities in `@layer utilities`, so a utility that sets a property of `listener.css` needs
-  the `!` modifier. The mic size override `[--hbv-size-mic:2.25rem]!` shows this. It matches the 36 px
+- `class` and `class_names` reach the right elements. `listener.css` puts every widget rule in
+  `@layer components`, and Tailwind v4 puts utilities in the later `@layer utilities`, so a plain utility
+  wins without `!`. The mic size override `[--hbv-size-mic:2.25rem]` shows this. It matches the 36 px
   shadcn icon button.
 - Tailwind v4 through the built-in Tailwind step of `dx` 0.7: `dx` finds `tailwind.css` next to
   `Cargo.toml` and writes `assets/tailwind.css` before it compiles the crate. Git ignores that output.
