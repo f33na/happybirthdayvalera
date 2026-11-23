@@ -1,0 +1,75 @@
+{
+  "$comment": "Visual tokens for both libraries. scripts/gen-css turns `color`, `size`, `radius`, `font` and `motion` into CSS custom properties named --hbv-<group>-<key>. `wave` drives the waveform math in CONTRACT.md and is read by code, not by CSS.",
+  "color": {
+    "pill-bg": "#17141f",
+    "pill-border": "rgba(255, 255, 255, 0.08)",
+    "pill-shadow": "0 8px 28px rgba(10, 6, 24, 0.45)",
+    "text": "#f3f0fa",
+    "text-muted": "#a49cb8",
+    "error": "#ff8a7a",
+    "strand-0": "#6ee7c8",
+    "strand-1": "#8aa4ff",
+    "strand-2": "#f59ac6",
+    "dot": "#f3f0fa",
+    "chip-bg": "rgba(255, 255, 255, 0.10)",
+    "chip-bg-hover": "rgba(255, 255, 255, 0.18)",
+    "chip-text": "#f3f0fa",
+    "mic-bg": "#24202e",
+    "mic-bg-hover": "#2f2a3b",
+    "mic-bg-active": "#3b2f5c",
+    "mic-icon": "#f3f0fa",
+    "mic-ring": "#8aa4ff",
+    "focus-ring": "#b9a6ff"
+  },
+  "size": {
+    "pill-height": "48px",
+    "pill-pad-x": "14px",
+    "pill-gap": "10px",
+    "wave-width": "72px",
+    "wave-height": "28px",
+    "dot": "4px",
+    "dot-gap": "4px",
+    "chip-height": "22px",
+    "chip-pad-x": "7px",
+    "mic": "40px",
+    "mic-icon": "18px",
+    "focus-ring": "2px"
+  },
+  "radius": {
+    "pill": "999px",
+    "chip": "6px",
+    "mic": "999px"
+  },
+  "font": {
+    "family": "ui-sans-serif, system-ui, -apple-system, \"Segoe UI\", Roboto, sans-serif",
+    "status-size": "14px",
+    "status-weight": "500",
+    "chip-size": "11px",
+    "chip-weight": "600"
+  },
+  "motion": {
+    "dots-period": "1.2s",
+    "dots-stagger": "0.15s",
+    "ring-period": "1.6s",
+    "celebrate-period": "1.2s",
+    "fade": "160ms"
+  },
+  "wave": {
+    "viewBoxWidth": 72,
+    "viewBoxHeight": 28,
+    "points": 48,
+    "strokeWidth": 2,
+    "strokePad": 2,
+    "idleAmp": 0.12,
+    "restAmp": 0.06,
+    "reducedMotionAmp": 0.5,
+    "levelGain": 6,
+    "attack": 0.5,
+    "release": 0.08,
+    "strands": [
+      { "freq": 1.5, "speed": 3.1, "phase": 0.0, "amp": 1.0, "opacity": 0.95 },
+      { "freq": 2.25, "speed": -2.3, "phase": 2.1, "amp": 0.75, "opacity": 0.8 },
+      { "freq": 3.0, "speed": 4.2, "phase": 4.2, "amp": 0.55, "opacity": 0.7 }
+    ]
+  }
+}

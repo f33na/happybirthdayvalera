@@ -1,0 +1,26 @@
+{
+  "$comment": "Runtime defaults for both libraries. Every value is overridable through the listener config.",
+  "sampleRate": 16000,
+  "vadThresholdRms": 0.012,
+  "minSpeechMs": 250,
+  "silenceMs": 1500,
+  "maxDurationMs": 30000,
+  "interimEveryMs": 0,
+  "easterEggMs": 3000,
+  "langCycle": ["en", "ru", "de", "fr"],
+  "persistLangKey": "happybirthdayvalera.lang",
+  "models": {
+    "default": "base",
+    "web": {
+      "tiny": "onnx-community/whisper-tiny",
+      "base": "onnx-community/whisper-base",
+      "small": "onnx-community/whisper-small"
+    },
+    "desktop": {
+      "baseUrl": "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/",
+      "tiny": "ggml-tiny.bin",
+      "base": "ggml-base.bin",
+      "small": "ggml-small.bin"
+    }
+  }
+}

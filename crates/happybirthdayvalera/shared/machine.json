@@ -1,0 +1,42 @@
+{
+  "$comment": "The listener state machine. Both machine.ts and machine.rs run table-driven tests over `transitions` and `ignored`. A (state, event) pair that is not in `transitions` leaves the state unchanged.",
+  "states": ["idle", "requesting", "loading-model", "listening", "transcribing", "error"],
+  "events": [
+    "START",
+    "MIC_READY",
+    "MIC_FAILED",
+    "MODEL_PROGRESS",
+    "MODEL_READY",
+    "MODEL_FAILED",
+    "STOP",
+    "SILENCE",
+    "RESULT",
+    "TRANSCRIBE_FAILED",
+    "RESET"
+  ],
+  "errors": ["mic-denied", "mic-unavailable", "unsupported", "model-failed", "transcribe-failed"],
+  "transitions": [
+    { "from": "idle", "event": "START", "to": "requesting" },
+    { "from": "error", "event": "START", "to": "requesting" },
+    { "from": "requesting", "event": "MIC_READY", "to": "loading-model" },
+    { "from": "requesting", "event": "MIC_FAILED", "to": "error" },
+    { "from": "requesting", "event": "STOP", "to": "idle" },
+    { "from": "loading-model", "event": "MODEL_PROGRESS", "to": "loading-model" },
+    { "from": "loading-model", "event": "MODEL_READY", "to": "listening" },
+    { "from": "loading-model", "event": "MODEL_FAILED", "to": "error" },
+    { "from": "loading-model", "event": "STOP", "to": "idle" },
+    { "from": "listening", "event": "STOP", "to": "transcribing" },
+    { "from": "listening", "event": "SILENCE", "to": "transcribing" },
+    { "from": "transcribing", "event": "RESULT", "to": "idle" },
+    { "from": "transcribing", "event": "TRANSCRIBE_FAILED", "to": "error" },
+    { "from": "error", "event": "RESET", "to": "idle" }
+  ],
+  "ignored": [
+    { "from": "idle", "event": "STOP" },
+    { "from": "listening", "event": "START" },
+    { "from": "transcribing", "event": "START" },
+    { "from": "transcribing", "event": "STOP" },
+    { "from": "idle", "event": "RESULT" },
+    { "from": "listening", "event": "MODEL_READY" }
+  ]
+}
