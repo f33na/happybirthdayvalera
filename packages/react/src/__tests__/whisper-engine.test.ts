@@ -45,6 +45,13 @@ describe('whisperEngine', () => {
     expect(onProgress).toHaveBeenCalledWith(0.5);
   });
 
+  it('passes wasmPaths in the load message', async () => {
+    const worker = new FakeWorker(happy);
+    const engine = whisperEngine({ createWorker: () => worker as unknown as Worker, wasmPaths: '/ort/' });
+    await engine.load('tiny', () => undefined);
+    expect(worker.sent[0]).toEqual({ type: 'load', model: 'onnx-community/whisper-tiny', wasmPaths: '/ort/' });
+  });
+
   it('does not load the same model twice', async () => {
     const { engine, worker } = engineWith();
     await engine.load('tiny', () => undefined);
