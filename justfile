@@ -25,8 +25,10 @@ test-ts:
     npm run -w happybirthdayvalera test
 
 test-rust:
-    cargo clippy -p happybirthdayvalera --all-targets --features web -- -D warnings
+    cargo clippy -p happybirthdayvalera --all-targets -- -D warnings
+    cargo clippy -p happybirthdayvalera --all-targets --features web --target wasm32-unknown-unknown -- -D warnings
     cargo clippy -p happybirthdayvalera --all-targets --features desktop -- -D warnings
+    cargo test -p happybirthdayvalera
     cargo test -p happybirthdayvalera --features desktop
 
 # Recognition tests over fixtures/: downloads the Whisper models on the first run
@@ -49,4 +51,5 @@ demo-desktop:
 # Packaging checks; nothing is published
 pack-check: build-ts
     cd packages/react && npm pack --dry-run
+    cargo publish -p happybirthdayvalera --dry-run --features web --allow-dirty
     cargo publish -p happybirthdayvalera --dry-run --features desktop --allow-dirty
