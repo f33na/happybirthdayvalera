@@ -1,3 +1,4 @@
+import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import { defineConfig } from 'vite';
 
@@ -6,9 +7,11 @@ import { defineConfig } from 'vite';
 const lib = new URL('../../packages/react/src/', import.meta.url).pathname;
 
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), tailwindcss()],
   resolve: {
     alias: [
+      { find: /^@\//, replacement: new URL('./src/', import.meta.url).pathname },
+      { find: 'happybirthdayvalera/evinvest', replacement: `${lib}evinvest/index.tsx` },
       { find: 'happybirthdayvalera/style.css', replacement: `${lib}styles.css` },
       { find: /^happybirthdayvalera$/, replacement: `${lib}index.ts` },
     ],

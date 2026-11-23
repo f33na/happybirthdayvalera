@@ -12,7 +12,12 @@
     "skipLibCheck": true,
     "noEmit": true,
     "types": ["vite/client"],
-    "paths": { "happybirthdayvalera": ["../../packages/react/src/index.ts"] }
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./src/*"],
+      "happybirthdayvalera": ["../../packages/react/src/index.ts"],
+      "happybirthdayvalera/evinvest": ["../../packages/react/src/evinvest/index.tsx"]
+    }
   },
-  "include": ["src"]
+  "include": ["src", "../../registry/voice-listener"]
 }
