@@ -23,6 +23,7 @@ test-ts:
     npm run -w happybirthdayvalera typecheck
     npm run -w happybirthdayvalera lint
     npm run -w happybirthdayvalera test
+    npm run registry:check
 
 test-rust:
     cargo clippy -p happybirthdayvalera --all-targets -- -D warnings
@@ -30,6 +31,12 @@ test-rust:
     cargo clippy -p happybirthdayvalera --all-targets --features desktop -- -D warnings
     cargo test -p happybirthdayvalera
     cargo test -p happybirthdayvalera --features desktop
+
+# ev_lib 0.34 enables nightly-only features; RUSTC_BOOTSTRAP lets the stable toolchain build it.
+test-rust-ev:
+    RUSTC_BOOTSTRAP=1 cargo clippy -p happybirthdayvalera --all-targets --features web,ev_uikit --target wasm32-unknown-unknown -- -D warnings
+    RUSTC_BOOTSTRAP=1 cargo clippy -p happybirthdayvalera --all-targets --features desktop,ev_uikit -- -D warnings
+    RUSTC_BOOTSTRAP=1 cargo test -p happybirthdayvalera --features desktop,ev_uikit
 
 # Recognition tests over fixtures/: downloads the Whisper models on the first run
 test-accuracy:
