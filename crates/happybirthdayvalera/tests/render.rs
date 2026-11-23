@@ -105,3 +105,44 @@ fn start_without_a_platform_ends_in_unsupported() {
     assert!(html.contains(r#"class="hbv-pill" role="group" aria-label="Voice input" data-state="error""#), "{html}");
     assert!(html.contains(r#"aria-pressed="false""#), "{html}");
 }
+
+#[cfg(feature = "ev_uikit")]
+mod ev {
+    use happybirthdayvalera::ev::{EvListenerPill, EvMicButton};
+
+    use super::*;
+
+    #[test]
+    fn ev_mic_is_a_native_button_with_kit_classes_and_aria() {
+        fn app() -> Element {
+            let listener = use_listener(ListenerConfig { lang: Some(Lang::De), ..Default::default() });
+            rsx! {
+                EvMicButton { listener, class: "host-x" }
+            }
+        }
+        let html = render(app);
+        assert!(html.contains("<button"), "{html}");
+        assert!(html.contains(r#"aria-pressed="false""#), "{html}");
+        assert!(html.contains(r#"aria-label="Spracheingabe starten""#), "{html}");
+        assert!(html.contains(r#"data-hbv-theme="evinvest""#), "{html}");
+        assert!(html.contains(r#"data-slot="button""#), "{html}");
+        let class = html.split(r#"class=""#).nth(1).and_then(|rest| rest.split('"').next()).unwrap();
+        assert!(class.contains("bg-secondary"), "the kit classes come first: {class}");
+        assert!(class.ends_with("hbv-mic host-x"), "contract class, then host classes: {class}");
+        assert!(html.contains("hbv-mic__ring") && html.contains("hbv-mic__icon"), "{html}");
+    }
+
+    #[test]
+    fn ev_pill_wraps_the_chip_button_in_the_kit_badge() {
+        fn app() -> Element {
+            let listener = use_listener(ListenerConfig::default());
+            rsx! {
+                EvListenerPill { listener }
+            }
+        }
+        let html = render(app);
+        assert!(html.contains(r#"data-hbv-theme="evinvest""#), "{html}");
+        assert!(html.contains(r#"data-slot="badge""#), "{html}");
+        assert!(html.contains(r#"<button type="button" class="hbv-lang" aria-label=""#), "{html}");
+    }
+}

@@ -4,6 +4,8 @@ mod components;
 mod controller;
 pub mod easter;
 pub mod engine;
+#[cfg(feature = "ev_uikit")]
+pub mod ev;
 pub mod i18n;
 pub mod lang;
 mod listener;
