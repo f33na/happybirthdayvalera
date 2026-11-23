@@ -1,0 +1,5 @@
+# Pinned so that local runs and CI see the same clippy lints. Bump together with .github/workflows/ci.yml.
+[toolchain]
+channel = "1.95.0"
+components = ["clippy", "rustfmt"]
+targets = ["wasm32-unknown-unknown"]
