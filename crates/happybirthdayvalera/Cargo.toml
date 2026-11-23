@@ -1,0 +1,93 @@
+[package]
+name = "happybirthdayvalera"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version = "1.88"
+description = "Voice input for Dioxus 0.7: a mic button and a waveform pill with local Whisper speech-to-text in English, Russian, German and French"
+readme = "README.md"
+keywords = ["dioxus", "speech-to-text", "whisper", "voice", "microphone"]
+categories = ["gui", "multimedia::audio", "wasm", "accessibility"]
+include = [
+    "/Cargo.toml",
+    "/README.md",
+    "/LICENSE",
+    "/src/**",
+    "/assets/**",
+    "/shared/*.json",
+]
+
+[features]
+default = []
+# Browser capture (getUserMedia + AudioWorklet) and Whisper in a Web Worker.
+web = ["dep:wasm-bindgen", "dep:wasm-bindgen-futures", "dep:js-sys", "dep:web-sys"]
+# Native capture (cpal) and whisper.cpp (whisper-rs) with a first-run model download.
+desktop = ["dep:cpal", "dep:whisper-rs", "dep:ureq", "dep:sha2", "dep:dirs", "dep:sys-locale"]
+# Runs whisper.cpp on the GPU through Metal on Apple platforms.
+metal = ["desktop", "whisper-rs?/metal"]
+# `EvMicButton` and `EvListenerPill` over the evinvest uikit (`ev_lib::uikit_dioxus`).
+ev_uikit = ["dep:ev_lib"]
+
+[dependencies]
+dioxus = { version = "0.7.9", default-features = false, features = ["lib"] }
+futures-channel = "0.3"
+futures-util = { version = "0.3", default-features = false, features = ["std", "async-await-macro"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tracing = "0.1"
+ev_lib = { version = "0.34", optional = true, default-features = false, features = ["uikit_dioxus"] }
+
+wasm-bindgen = { version = "0.2", optional = true }
+wasm-bindgen-futures = { version = "0.4", optional = true }
+js-sys = { version = "0.3", optional = true }
+web-sys = { version = "0.3", optional = true, features = [
+    "AudioContext",
+    "AudioContextState",
+    "AudioDestinationNode",
+    "AudioNode",
+    "AudioParam",
+    "AudioWorklet",
+    "AudioWorkletNode",
+    "AudioWorkletNodeOptions",
+    "BaseAudioContext",
+    "Blob",
+    "BlobPropertyBag",
+    "DomException",
+    "ErrorEvent",
+    "GainNode",
+    "MediaDevices",
+    "MediaStream",
+    "MediaStreamAudioSourceNode",
+    "MediaStreamConstraints",
+    "MediaStreamTrack",
+    "MessageEvent",
+    "MessagePort",
+    "Navigator",
+    "Storage",
+    "Url",
+    "Window",
+    "Worker",
+    "WorkerOptions",
+    "WorkerType",
+] }
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+cpal = { version = "0.18", optional = true }
+whisper-rs = { version = "0.16", optional = true }
+ureq = { version = "3", optional = true, default-features = false, features = ["rustls"] }
+sha2 = { version = "0.10", optional = true }
+dirs = { version = "6", optional = true }
+sys-locale = { version = "0.3", optional = true }
+
+[dev-dependencies]
+futures-executor = "0.3"
+dioxus-ssr = "0.7.9"
+
+[lints.rust]
+unsafe_code = "forbid"
+missing_docs = "warn"
+
+[lints.clippy]
+pedantic = { level = "warn", priority = -1 }
+module_name_repetitions = "allow"
