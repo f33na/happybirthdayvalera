@@ -48,6 +48,24 @@ demo-web:
 demo-desktop:
     cd examples/dioxus-demo && dx serve --platform desktop
 
+# Stands: a dictation composer per kit, on the public API of the crate (web only)
+stand-dioxus-shadcn:
+    cd examples/stand-dioxus-shadcn && dx serve --platform web --port 8201
+
+# ev_lib 0.34 enables nightly-only features; RUSTC_BOOTSTRAP lets the stable toolchain build it.
+# dx runs Tailwind before cargo, so cargo check first runs build.rs, which writes the kit CSS that Tailwind reads.
+stand-dioxus-evinvest:
+    RUSTC_BOOTSTRAP=1 cargo check -p stand-dioxus-evinvest --target wasm32-unknown-unknown
+    cd examples/stand-dioxus-evinvest && RUSTC_BOOTSTRAP=1 dx serve --platform web --port 8202
+
+# shadcn: clippy after dx, because asset! needs the assets/tailwind.css that the Tailwind step of dx writes.
+# evinvest: clippy before dx, because its build.rs writes what Tailwind reads (see above).
+stands-dioxus-build:
+    cd examples/stand-dioxus-shadcn && dx build --platform web
+    cargo clippy -p stand-dioxus-shadcn --all-targets --target wasm32-unknown-unknown -- -D warnings
+    RUSTC_BOOTSTRAP=1 cargo clippy -p stand-dioxus-evinvest --all-targets --target wasm32-unknown-unknown -- -D warnings
+    cd examples/stand-dioxus-evinvest && RUSTC_BOOTSTRAP=1 dx build --platform web
+
 # Packaging checks; nothing is published
 pack-check: build-ts
     cd packages/react && npm pack --dry-run
