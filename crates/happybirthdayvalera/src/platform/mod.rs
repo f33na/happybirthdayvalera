@@ -11,7 +11,20 @@
 //! - `preferred_locales()`, `load_lang(key)`, `store_lang(key, lang)`.
 //! - `sleep_ms(ms)`.
 
+#[cfg(all(feature = "desktop", not(target_arch = "wasm32")))]
+mod desktop;
+#[cfg(all(feature = "desktop", not(target_arch = "wasm32")))]
+pub(crate) use desktop::*;
+#[cfg(all(feature = "desktop", not(target_arch = "wasm32")))]
+pub use desktop::{ModelStore, WhisperEngine};
+
+#[cfg(not(any(
+    all(feature = "desktop", not(target_arch = "wasm32")),
+)))]
 mod none;
+#[cfg(not(any(
+    all(feature = "desktop", not(target_arch = "wasm32")),
+)))]
 pub(crate) use none::*;
 
 mod thread_timer;
