@@ -48,6 +48,13 @@ See `machine.json`. Notes:
 - `STOP` in `requesting` or `loading-model` cancels and releases the microphone.
 - `RESULT` with empty text goes to `idle`, and the UI shows `status.nothingHeard` until the next `START`.
 - After a non-empty `RESULT`, the UI shows `status.idle`, and `onResult(text, lang)` fires once.
+- `progress` is a fraction 0..1, or unknown (`null` in TS, `None` in Rust). The status is
+  `status.loadingModel` with `{percent}` when it is known, and `status.loadingModelUnknown` when it is not.
+  Do not fake a percentage: a response without a readable size (CDN without `content-length`, a Cache API
+  hit) makes the progress unknown until every file size is known.
+- `pillVisible` / `pill_visible` is `state !== 'idle' || nothingHeard || celebrating`. Hosts mount the pill
+  on it, and the README examples use it. A host that hides the pill in `idle` would never show the easter
+  egg.
 - Leaving `listening` releases the microphone at once, before transcription ends.
 
 Error code to string key: `mic-denied` → `error.micDenied`, `mic-unavailable` → `error.micUnavailable`,
@@ -106,7 +113,7 @@ Main → worker:
 Worker → main:
 
 ```ts
-{ type: 'progress', fraction: number }          // 0..1, aggregated over all model files
+{ type: 'progress', fraction?: number }         // 0..1 over all model files; absent while any size is unknown
 { type: 'ready' }
 { type: 'result', id: number, text: string }
 { type: 'error', id?: number, message: string } // id is absent for a load error
@@ -123,7 +130,7 @@ const listener = useListener({ lang?, persistLang?, engine?, model?, onResult?, 
                                interimEveryMs?, silenceMs?, easterEgg?, preload?, theme? });
 // listener: { state, error, progress, text, interim, lang, setLang, cycleLang,
 //             start, stop, toggle, reset, celebrating, levelRef, theme,
-//             nothingHeard, langLocked }
+//             nothingHeard, langLocked, pillVisible }  (progress: number | null)
 // nothingHeard: the last RESULT was empty, until the next START. langLocked: `lang` is forced; hide the chip.
 <MicButton listener={listener} theme? className? classNames? asChild? />
 <ListenerPill listener={listener} theme? className? classNames? components? />
@@ -289,8 +296,15 @@ adapter uses only the kit's own class builders and components, plus the `hbv-*` 
 
 Off by default (`easterEgg: false`). Normalize the final text: lowercase, replace `ё` with `е`, replace every
 character that is not a letter, digit or space with a space, and collapse whitespace. If the result contains
-any phrase from `birthdayPhrases` of any language, set `celebrating` for `easterEggMs`. The pill gets
-`data-celebrate="true"`, and CSS animates a rainbow on the strands.
+any phrase from `birthdayPhrases` of any language, set `celebrating` for `easterEggMs`. While it is set:
+
+- `pillVisible` is true.
+- The pill and the mic button both get `data-celebrate="true"`.
+- The pill shows the final text in `.hbv-pill__text`.
+- The waveform keeps animating at `A = idleAmp + (1 − idleAmp) · 0.6`.
+- CSS animates a rainbow on the strands.
+
+A new `START` ends the celebration.
 
 ## Generated files
 
