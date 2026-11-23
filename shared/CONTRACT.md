@@ -114,11 +114,11 @@ TypeScript:
 
 ```tsx
 const listener = useListener({ lang?, persistLang?, engine?, model?, onResult?, onInterim?,
-                               interimEveryMs?, silenceMs?, easterEgg?, preload? });
+                               interimEveryMs?, silenceMs?, easterEgg?, preload?, theme? });
 // listener: { state, error, progress, text, interim, lang, setLang, cycleLang,
-//             start, stop, toggle, reset, celebrating, levelRef }
-<MicButton listener={listener} />
-<ListenerPill listener={listener} />
+//             start, stop, toggle, reset, celebrating, levelRef, theme }
+<MicButton listener={listener} theme? className? classNames? asChild? />
+<ListenerPill listener={listener} theme? className? classNames? components? />
 ```
 
 Rust (Dioxus 0.7):
@@ -128,7 +128,9 @@ let listener = use_listener(ListenerConfig { lang: None, model: ModelSize::Base,
 rsx! { MicButton { listener } ListenerPill { listener } }
 ```
 
-`Listener` is a `Copy` handle with signals. Cargo features: `web` and `desktop`. The crate does not enable a
+`Listener` is a `Copy` handle with signals. `ListenerConfig` has `theme: Theme`, and the components take
+optional `theme`, `class` and `class_names` props (see Theming). Cargo features: `web`, `desktop`, and
+`ev_uikit` (an adapter that combines with either of them). The crate does not enable a
 Dioxus renderer itself; the app does.
 
 `levelRef` (TS) and the level signal (Rust) carry the smoothed level 0..1. The TS waveform reads it in
@@ -191,6 +193,89 @@ reference generator is `scripts/wave-fixture.mjs`; run it again after a change t
 
 Each strand gets `stroke: var(--hbv-color-strand-<i>)`, `stroke-width: strokeWidth`, `opacity: opacity_i`,
 `fill: none`, and round caps and joins.
+
+## Theming and design-system adapters
+
+The widget must look native inside a host design system. There are three layers. A host uses the first one
+that is enough.
+
+### 1. Token scope and theme presets
+
+- The generated stylesheet declares the default `--hbv-*` values on `:where(.hbv-mic, .hbv-pill)`, not on
+  `:root`. A custom property that references another one resolves on the element that declares it. On the
+  widget element, `var(--popover)` picks up the nearest host scope: `.dark`, `.light`, `[data-brand]` or
+  `[data-theme]`. Specificity zero lets any host class override any token.
+- `theme` is `'default' | 'shadcn' | 'evinvest'`, and the default is `'default'`. It is set in the listener
+  config and can be overridden per component. Both root elements render it as `data-hbv-theme="<theme>"`.
+- The preset files are `shared/themes/shadcn.css` and `shared/themes/evinvest.css`. They are hand-written, and
+  every selector is wrapped in `:where(...)`. The generator appends them after the base CSS in the one
+  generated stylesheet, so a host imports a single file. A preset uses only the host's CSS variables. It needs
+  no Tailwind and no dependency on the kit.
+
+Preset mapping (`<token>` ← host variable; tokens not listed keep their default):
+
+| `--hbv-color-*` | shadcn (v4: oklch, raw `var()`) | evinvest (`@evinvest/uikit` ≥ 0.36, hex) |
+| --- | --- | --- |
+| `pill-bg` | `var(--popover)` | `var(--popover)` |
+| `pill-border` | `var(--border)` | `var(--border)` |
+| `pill-shadow` | `0 4px 16px color-mix(in oklab, var(--foreground) 12%, transparent)` | `none` (the kit has no shadows) |
+| `text` | `var(--popover-foreground)` | `var(--ink)` |
+| `text-muted` | `var(--muted-foreground)` | `var(--ink-mid)` |
+| `error` | `var(--destructive)` | `var(--accent-error)` |
+| `strand-0/1/2` | `var(--chart-1/2/3)` | `var(--chart-1/2/3)` |
+| `dot` | `var(--popover-foreground)` | `var(--ink)` |
+| `chip-bg` / `chip-bg-hover` | `var(--secondary)` / `var(--accent)` | `var(--tint-neutral-fill)` / `var(--hover)` |
+| `chip-text` | `var(--secondary-foreground)` | `var(--ink)` |
+| `mic-bg` / `mic-bg-hover` | `var(--secondary)` / `var(--accent)` | `var(--secondary)` / `var(--hover)` |
+| `mic-bg-active` / `mic-icon` active | `var(--primary)` / `var(--primary-foreground)` | `var(--primary)` / `var(--on-primary)` |
+| `mic-icon` | `var(--secondary-foreground)` | `var(--ink)` |
+| `mic-ring` / `focus-ring` | `var(--ring)` | `var(--ring)` |
+
+Also: `--hbv-radius-chip` ← `calc(var(--radius) - 4px)` (shadcn) or `var(--chip-radius)` (evinvest), and
+`--hbv-font-family` ← `inherit` (shadcn) or `var(--font-sans)` (evinvest). The active mic needs a token
+`--hbv-color-mic-icon-active`; add it to `design-tokens.json` with the default `#ffffff`. shadcn v3 hosts use
+HSL triplets (`hsl(var(--popover))`); v3 is out of scope, and the README says how to override.
+
+### 2. Slots and your own button
+
+- Every component accepts a root class (`className` in React, `class` in Dioxus). It also accepts a per-part
+  map: `classNames` in React, a `class_names` struct in Rust. The parts are `root`, `ring` and `icon` for the
+  mic, and `root`, `wave`, `strand`, `status`, `text`, `dots` and `lang` for the pill. The contract class
+  names always stay. The host classes are added after them.
+- React `MicButton` takes `asChild`. It then renders its single child element instead of its own `<button>`,
+  merges `className`, composes `onClick`, forwards `ref`, and puts in all contract `aria-*` and `data-*`
+  attributes and the ring and icon children. Use it with a shadcn
+  `<Button variant="outline" size="icon">`. The implementation has no Radix dependency.
+- React `ListenerPill` takes `components={{ LangButton }}`. That is a component that receives button props
+  plus `children`.
+- Headless helpers for hosts that compose their own UI are exported from both libraries: `wavePath(...)`
+  (`wave_path`), a translator `t(lang, key, vars)`, `micButtonProps(listener)` (`mic_button_props`), which
+  returns the aria, data and click props, and the standalone `Waveform`.
+- Rust has no `asChild`. `MicButton` and `ListenerPill` take the `class` and `class_names` overrides, and
+  `mic_button_props` lets a host render any element.
+
+### 3. Native adapters
+
+Rule: an adapter never adds its own Tailwind utility classes. Tailwind cannot scan a published package. An
+adapter uses only the kit's own class builders and components, plus the `hbv-*` CSS.
+
+- **`happybirthdayvalera/evinvest`** (npm subpath export; `@evinvest/uikit` `>=0.36 <1` is an optional peer
+  dependency). It exports `EvMicButton` and `EvListenerPill`, and sets `theme: 'evinvest'`. The mic is a
+  native `<button>` with `className={cn(buttonVariants({ variant, size, icon: true }), 'hbv-mic')}`. Do not
+  use their `Button`, so that all aria attributes stay. The lang chip uses their `Badge` with `asChild` over
+  a `<button>`. The main entry never imports this subpath.
+- **shadcn registry item** in `registry/` (`registry.json` + `registry/voice-listener/voice-listener.tsx`).
+  It is copied into the host by `npx shadcn add <url>`. It imports `@/components/ui/button` and
+  `@/lib/utils`, and it uses Tailwind classes on the shadcn tokens over the headless `useListener` and
+  `Waveform`. It is built to `registry/public/r/*.json` with the shadcn CLI. The URL works once the repo is
+  public.
+- **Rust feature `ev_uikit`**: optional dependency
+  `ev_lib = { version = "0.34", default-features = false, features = ["uikit_dioxus"] }` and the module
+  `happybirthdayvalera::ev` with `EvMicButton` and `EvListenerPill`. `ev_lib::uikit_dioxus::Button` has no
+  aria passthrough. If `ev_lib` exposes its button class builder (`ev_lib_classes`), render a native
+  `button { class: <builder>, aria_pressed, aria_label, … }`. If it does not, use their `Button` and record
+  the a11y gap as an upstream request to `EV-Main/web_std`. A host on this kit already runs Tailwind with
+  `ev_lib_classes::CLASS_INVENTORY`. The adapter must therefore use only class strings from that inventory.
 
 ## Easter egg
 
