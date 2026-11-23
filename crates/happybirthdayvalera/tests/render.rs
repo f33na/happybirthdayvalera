@@ -137,12 +137,16 @@ mod ev {
         fn app() -> Element {
             let listener = use_listener(ListenerConfig::default());
             rsx! {
-                EvListenerPill { listener }
+                EvListenerPill { listener, class_names: PillClassNames { lang: "host-lang".into(), ..Default::default() } }
             }
         }
         let html = render(app);
         assert!(html.contains(r#"data-hbv-theme="evinvest""#), "{html}");
         assert!(html.contains(r#"data-slot="badge""#), "{html}");
-        assert!(html.contains(r#"<button type="button" class="hbv-lang" aria-label=""#), "{html}");
+        // The bare reset sits between the contract class and the host class.
+        assert!(
+            html.contains(r#"<button type="button" class="hbv-lang hbv-lang--bare host-lang" aria-label=""#),
+            "{html}"
+        );
     }
 }

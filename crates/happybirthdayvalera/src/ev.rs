@@ -58,7 +58,8 @@ pub fn EvMicButton(
 /// The pill with the language chip inside the kit's `Badge`.
 ///
 /// The Dioxus `Badge` is a `<span>` without `asChild`, so the chip stays a native `<button class="hbv-lang">`
-/// inside it, with its `aria-label`.
+/// inside it, with its `aria-label`. `hbv-lang--bare` drops the button's own fill, border and padding, so
+/// the badge is the only box.
 #[component]
 pub fn EvListenerPill(
     listener: Listener,
@@ -72,9 +73,10 @@ pub fn EvListenerPill(
     class: String,
     /// Per-part classes, added after the contract classes.
     #[props(default)]
-    class_names: PillClassNames,
+    mut class_names: PillClassNames,
 ) -> Element {
     let p = pill_props(listener, Some(theme.unwrap_or(Theme::Evinvest)));
+    class_names.lang = class_list("hbv-lang--bare", &[&class_names.lang]);
     render_pill(&listener, p, &class, class_names, |chip| rsx! {
         Badge { tone: lang_tone, {chip} }
     })
