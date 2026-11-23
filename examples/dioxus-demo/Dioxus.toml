@@ -1,0 +1,5 @@
+[application]
+name = "dioxus-demo"
+
+[web.app]
+title = "happybirthdayvalera — Dioxus demo"

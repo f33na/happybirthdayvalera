@@ -1,0 +1,9 @@
+/*
+ * Tailwind v4 entry. `dx` 0.7 finds this file next to Cargo.toml, runs the Tailwind CLI on it and writes
+ * assets/tailwind.css. build.rs writes the two kit files it reads. All three outputs are ignored by git.
+ */
+@import "tailwindcss";
+@import "./assets/tokens.css";
+
+@source "./uikit-classes.txt";
+@source "./src";

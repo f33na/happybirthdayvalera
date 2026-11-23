@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["crates/happybirthdayvalera", "examples/dioxus-demo"]
+members = ["crates/happybirthdayvalera", "examples/dioxus-demo", "examples/stand-dioxus-shadcn", "examples/stand-dioxus-evinvest"]
 
 [workspace.package]
 edition = "2024"
