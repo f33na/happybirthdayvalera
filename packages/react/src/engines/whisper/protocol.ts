@@ -2,7 +2,7 @@ import type { Lang } from '../../core/data';
 
 /** Main → worker. The `pcm` buffer of `transcribe` is transferred. */
 export type WorkerRequest =
-  | { type: 'load'; model: string; wasmPaths?: string }
+  | { type: 'load'; model: string; wasmPaths?: string; modelBaseUrl?: string }
   | { type: 'transcribe'; id: number; pcm: Float32Array; lang: Lang };
 
 /** Worker → main. `error.id` is absent for a load error. */

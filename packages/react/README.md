@@ -41,7 +41,7 @@ The first tap asks for the microphone and downloads the model. Later taps start 
 | `lang` | detected | Force `'en' \| 'ru' \| 'de' \| 'fr'`. The language chip is hidden while it is set. |
 | `persistLang` | `false` | Remember the language picked with the chip in `localStorage`. |
 | `engine` | `'whisper'` | `'whisper'`, `'webspeech'` or your own `SpeechEngine`. |
-| `model` | `'base'` | Whisper size: `'tiny'`, `'base'` or `'small'`. |
+| `model` | `'tiny'` | Whisper size: `'tiny'`, `'base'` or `'small'`. |
 | `onResult(text, lang)` | none | Called once per utterance with the final text. |
 | `onInterim(text, lang)` | none | Called with partial text while listening. |
 | `interimEveryMs` | `0` | Transcribe the audio so far at this interval. `0` turns it off. |
@@ -49,6 +49,7 @@ The first tap asks for the microphone and downloads the model. Later taps start 
 | `easterEgg` | `false` | Celebrate when the text contains a birthday phrase, in any of the four languages. |
 | `preload` | `false` | Load the model on mount, not on the first tap. |
 | `theme` | `'default'` | `'default'`, `'shadcn'` or `'evinvest'`. See [Theming](#theming). |
+| `modelBaseUrl` | Hub | Base URL of your own copy of the model files and the onnxruntime files. See [Self-hosted models](#self-hosted-models). |
 | `wasmPaths` | CDN | Base URL of the onnxruntime `.wasm` files (default Whisper engine). See [Fully offline](#fully-offline). |
 
 The language is the forced `lang`, then the stored choice (with `persistLang`), then the browser language.
@@ -93,8 +94,8 @@ Whisper models from `onnx-community`, quantized to 8 bit. Sizes are approximate 
 
 | `model` | Download | Notes |
 | --- | --- | --- |
-| `tiny` | about 40 MB | fast, makes more mistakes |
-| `base` | about 80 MB | the default; a good balance |
+| `tiny` | about 40 MB | the default; fast, makes more mistakes |
+| `base` | about 80 MB | a good balance |
 | `small` | about 250 MB | best accuracy, slow on a phone |
 
 The language is forced, so Whisper does not guess it. The task is always `transcribe`, never `translate`.
@@ -142,7 +143,20 @@ To run with no network at all after the first visit:
    before the first load succeeds, add a service worker that caches the Hugging Face model URLs, or host the
    model files yourself.
 
-## Styles
+### Self-hosted models
+
+By default the model files come from the Hugging Face Hub and the onnxruntime files from jsDelivr. To serve them
+from your own host or CDN, pass `modelBaseUrl`: `useListener({ modelBaseUrl: 'https://cdn.example.com/hbv/' })`
+or `whisperEngine({ modelBaseUrl })`. A missing trailing `/` is added. The host needs CORS and a
+`content-length` header on `HEAD` and `GET`. Without `content-length` the progress stays unknown.
+
+```text
+<base>onnx-community/whisper-tiny/config.json
+<base>onnx-community/whisper-tiny/onnx/encoder_model_quantized.onnx
+<base>ort/ort-wasm-simd-threaded.jsep.mjs     (the onnxruntime files; `wasmPaths` wins if you set it)
+```
+
+In the repository, `just fetch-models` and `just serve-models` build and serve this layout for local work.
 
 `import 'happybirthdayvalera/style.css'` adds one small stylesheet. Every colour, size, radius, font and
 duration is a CSS custom property named `--hbv-<group>-<key>`, for example `--hbv-color-pill-bg`. The

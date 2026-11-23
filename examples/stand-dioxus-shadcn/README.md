@@ -18,6 +18,10 @@ You need `dx` 0.7.9 and the `wasm32-unknown-unknown` target. On the first build,
 Tailwind CLI v4. The real `listener.css` and `whisper-worker.js` come from `just sync-assets`. With the
 placeholders, the page renders, but the pill reports a model error.
 
+To load the models from a local host instead of the Hugging Face Hub, run `just fetch-models` and
+`just serve-models`, then start the stand with `HBV_MODEL_BASE_URL=http://localhost:5299/`. The stand reads
+the variable at build time.
+
 ## What it proves
 
 - The stand uses only the public API of the crate: `use_listener`, `ListenerConfig`, `MicButton`,

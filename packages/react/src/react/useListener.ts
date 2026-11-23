@@ -17,7 +17,7 @@ export interface UseListenerOptions {
   persistLang?: boolean;
   /** `'whisper'` (default), `'webspeech'` or your own `SpeechEngine`. */
   engine?: EngineChoice;
-  /** Whisper model size. Default `'base'`. */
+  /** Whisper model size. Default `'tiny'`. */
   model?: ModelSize;
   /** Fires once per utterance with the final text. */
   onResult?: (text: string, lang: Lang) => void;
@@ -38,6 +38,11 @@ export interface UseListenerOptions {
    * Default: the jsDelivr CDN. Set it for a fully offline app.
    */
   wasmPaths?: string;
+  /**
+   * Self-hosted models (the default Whisper engine only): a base URL that serves `<model id>/…` and `ort/`.
+   * Default: the Hugging Face Hub and jsDelivr. See the README, "Self-hosted models".
+   */
+  modelBaseUrl?: string;
 }
 
 export interface Listener {
@@ -68,8 +73,12 @@ export interface Listener {
   pillVisible: boolean;
 }
 
-function createEngine(choice: 'whisper' | 'webspeech', wasmPaths: string | undefined): SpeechEngine {
-  return choice === 'webspeech' ? webSpeechEngine() : whisperEngine({ wasmPaths });
+function createEngine(
+  choice: 'whisper' | 'webspeech',
+  wasmPaths: string | undefined,
+  modelBaseUrl: string | undefined,
+): SpeechEngine {
+  return choice === 'webspeech' ? webSpeechEngine() : whisperEngine({ wasmPaths, modelBaseUrl });
 }
 
 function subscribeLanguages(onChange: () => void): () => void {
@@ -100,6 +109,7 @@ export function useListener(options: UseListenerOptions = {}): Listener {
     preload = false,
     theme = 'default',
     wasmPaths,
+    modelBaseUrl,
   } = options;
 
   // `navigator` does not exist on the server, so the server snapshot is `en` and the client corrects it after hydration.
@@ -108,8 +118,8 @@ export function useListener(options: UseListenerOptions = {}): Listener {
   const lang = forcedLang ?? chosen ?? detected;
 
   const engine = useMemo(
-    () => (typeof engineChoice === 'string' ? createEngine(engineChoice, wasmPaths) : engineChoice),
-    [engineChoice, wasmPaths],
+    () => (typeof engineChoice === 'string' ? createEngine(engineChoice, wasmPaths, modelBaseUrl) : engineChoice),
+    [engineChoice, wasmPaths, modelBaseUrl],
   );
   // Engines made here are ours to dispose; a user-supplied one is not.
   const ownsEngine = typeof engineChoice === 'string';

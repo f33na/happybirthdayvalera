@@ -46,15 +46,24 @@ test-accuracy:
 build-ts:
     npm run -w happybirthdayvalera build
 
+# Self-hosted models for fast local work. Fetch once, then serve and point a stand at it:
+#   HBV_MODEL_BASE_URL=http://localhost:5299/ just stand-react-shadcn
+# The Dioxus recipes read the same variable at compile time (option_env!).
+fetch-models size="tiny":
+    node scripts/fetch-models.mjs {{size}}
+
+serve-models:
+    node scripts/serve-models.mjs 5299
+
 demo-react:
-    npm run -w react-demo dev
+    VITE_HBV_MODEL_BASE_URL="${HBV_MODEL_BASE_URL:-}" npm run -w react-demo dev
 
 # A stand is a standalone consumer app of the built package, so the package is built first
 stand-react-shadcn: build-ts
-    npm run -w stand-react-shadcn dev
+    VITE_HBV_MODEL_BASE_URL="${HBV_MODEL_BASE_URL:-}" npm run -w stand-react-shadcn dev
 
 stand-react-evinvest: build-ts
-    npm run -w stand-react-evinvest dev
+    VITE_HBV_MODEL_BASE_URL="${HBV_MODEL_BASE_URL:-}" npm run -w stand-react-evinvest dev
 
 # Build the package, then typecheck and build both React stands
 stands-react-build: build-ts

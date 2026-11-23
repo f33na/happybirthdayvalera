@@ -17,6 +17,7 @@ import { useListener } from 'happybirthdayvalera';
 import 'happybirthdayvalera/style.css';
 import { EvListenerPill, EvMicButton } from 'happybirthdayvalera/evinvest';
 import { useState } from 'react';
+import { modelBaseUrl } from './model-base-url';
 
 const initialLight = (): boolean => new URLSearchParams(location.search).get('mode') === 'light';
 
@@ -26,6 +27,7 @@ export function App() {
   const [text, setText] = useState('');
   const listener = useListener({
     theme: 'evinvest',
+    modelBaseUrl,
     easterEgg: true,
     persistLang: true,
     onResult: (result) => setText((v) => (v ? `${v} ${result}` : result)),

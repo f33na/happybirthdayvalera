@@ -1,6 +1,7 @@
 //! Recognition accuracy over `fixtures/`: whisper.cpp transcribes each phrase with the language forced, and
-//! the text must contain every key word. The first run downloads `ggml-base.bin` (148 MB) into the default
-//! model store. Run with `cargo test -p happybirthdayvalera --features desktop -- --ignored`.
+//! the text must contain every key word. It checks the default model of `behavior.json` (`tiny`); the first
+//! run downloads `ggml-tiny.bin` (78 MB) into the default model store, from `HBV_MODEL_BASE_URL` when that is
+//! set. Run with `cargo test -p happybirthdayvalera --features desktop -- --ignored`.
 #![cfg(all(feature = "desktop", not(target_arch = "wasm32")))]
 
 use std::collections::BTreeMap;
@@ -8,7 +9,7 @@ use std::path::{Path, PathBuf};
 
 use futures_executor::block_on;
 use happybirthdayvalera::easter::is_birthday_phrase;
-use happybirthdayvalera::{Lang, ModelSize, SpeechEngine as _, WhisperEngine};
+use happybirthdayvalera::{Lang, ModelSize, ModelStore, SpeechEngine as _, WhisperEngine};
 use serde::Deserialize;
 
 #[derive(Deserialize)]
@@ -58,12 +59,17 @@ fn wav_reader_skips_extra_chunks() {
 }
 
 #[test]
-#[ignore = "downloads ggml-base.bin on the first run and takes about a minute on a CPU"]
-fn whisper_base_hears_every_fixture() {
+#[ignore = "downloads the default model on the first run and takes about a minute on a CPU"]
+fn the_default_model_hears_every_fixture() {
     let raw = std::fs::read_to_string(fixtures().join("expected.json")).unwrap();
     let expected: BTreeMap<String, serde_json::Value> = serde_json::from_str(&raw).unwrap();
-    let engine = WhisperEngine::new();
-    block_on(engine.load(ModelSize::Base, &|_| {})).expect("the base model loads");
+    let store = match std::env::var("HBV_MODEL_BASE_URL") {
+        Ok(base) if !base.is_empty() => ModelStore::default().with_base_url(base),
+        _ => ModelStore::default(),
+    };
+    let engine = WhisperEngine::with_store(store);
+    let model = ModelSize::default();
+    block_on(engine.load(model, &|_| {})).unwrap_or_else(|e| panic!("the {model} model loads: {e}"));
 
     let mut failures = Vec::new();
     for (code, value) in expected.into_iter().filter(|(k, _)| !k.starts_with('$')) {

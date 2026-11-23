@@ -13,9 +13,9 @@ use crate::shared::BEHAVIOR;
 /// A Whisper model size. The default comes from `behavior.json` → `models.default`.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum ModelSize {
-    /// About 75 MB; fastest, least accurate.
+    /// About 41 MB on the web (q8) and 78 MB on desktop; fastest, least accurate; the default.
     Tiny,
-    /// About 142 MB; the default.
+    /// About 77 MB on the web (q8) and 148 MB on desktop.
     Base,
     /// About 466 MB.
     Small,
@@ -23,7 +23,7 @@ pub enum ModelSize {
 
 impl Default for ModelSize {
     fn default() -> Self {
-        BEHAVIOR.models.default.parse().unwrap_or(ModelSize::Base)
+        BEHAVIOR.models.default.parse().unwrap_or(ModelSize::Tiny)
     }
 }
 
@@ -63,11 +63,16 @@ impl ModelSize {
         }
     }
 
-    /// The download URL of the whisper.cpp file.
+    /// The download URL of the whisper.cpp file on the Hugging Face Hub.
     #[must_use]
     pub fn ggml_url(self) -> String {
         format!("{}{}", BEHAVIOR.models.desktop.base_url, self.ggml_file_name())
     }
+}
+
+/// Adds the trailing `/` that the model URL layout needs: every file URL is the base plus a relative path.
+pub(crate) fn normalize_base_url(url: &str) -> String {
+    if url.ends_with('/') { url.to_owned() } else { format!("{url}/") }
 }
 
 impl fmt::Display for ModelSize {
@@ -265,11 +270,18 @@ mod tests {
 
     #[test]
     fn model_names_come_from_behavior_json() {
-        assert_eq!(ModelSize::default(), ModelSize::Base);
+        assert_eq!(ModelSize::default(), ModelSize::Tiny);
         assert_eq!(ModelSize::Base.web_model_id(), "onnx-community/whisper-base");
         assert_eq!(
             ModelSize::Tiny.ggml_url(),
             "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-tiny.bin"
         );
+    }
+
+    #[test]
+    fn a_base_url_gets_one_trailing_slash() {
+        assert_eq!(normalize_base_url("http://localhost:5299"), "http://localhost:5299/");
+        assert_eq!(normalize_base_url("http://localhost:5299/"), "http://localhost:5299/");
+        assert_eq!(normalize_base_url("/models"), "/models/");
     }
 }

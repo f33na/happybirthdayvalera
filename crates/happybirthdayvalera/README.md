@@ -60,12 +60,27 @@ the ALSA headers (`libasound2-dev`).
 
 ## Models
 
-The default model is Whisper `base`; set `ListenerConfig::model` to `ModelSize::Tiny` or `ModelSize::Small`.
+The default model is Whisper `tiny`; set `ListenerConfig::model` to `ModelSize::Base` or `ModelSize::Small` for
+better accuracy at a larger download.
 
 - **Desktop** downloads `ggml-<size>.bin` from `huggingface.co/ggerganov/whisper.cpp` on the first `START` into
   `<cache dir>/happybirthdayvalera/models`. The pill shows the progress. The file is written to a `.part` file,
   checked against a SHA-256 pinned in the crate and renamed only after the check.
-- **Web** loads `onnx-community/whisper-<size>` in the Web Worker; the browser caches it.
+- **Web** loads `onnx-community/whisper-<size>` in the Web Worker; the browser caches it. The q8 `tiny`
+  files are about 41 MB, plus about 20 MB of onnxruntime wasm from jsDelivr.
+
+### Self-hosted models
+
+Set `ListenerConfig::model_base_url` to load every file from your own host instead of the Hugging Face Hub
+and jsDelivr. The default engine adds a missing trailing `/` and expects this layout under the base URL:
+
+- `<base>onnx-community/whisper-<size>/…`: the transformers.js model files (web);
+- `<base>ort/`: the onnxruntime-web `.wasm` and `.mjs` files (web), unless the engine sets `wasm_paths`;
+- `<base>ggml-<size>.bin`: the whisper.cpp files (desktop). The download is still checked against the pinned
+  SHA-256, and the file goes to the same cache directory.
+
+The option counts on the first render only, and it is ignored when `ListenerConfig::engine` is set. For a
+custom engine, use `WorkerEngine::model_base_url` (web) or `ModelStore::with_base_url` (desktop).
 
 macOS asks for microphone access on the first capture. A bundled desktop app needs
 `NSMicrophoneUsageDescription` in its `Info.plist`.

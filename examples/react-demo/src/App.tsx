@@ -4,9 +4,10 @@ import { EvListenerPill, EvMicButton } from 'happybirthdayvalera/evinvest';
 import { useLayoutEffect, useState } from 'react';
 import { VoiceListener } from '../../../registry/voice-listener/voice-listener';
 import { Button } from '@/components/ui/button';
+import { modelBaseUrl } from './model-base-url';
 
 const MODELS: { value: ModelSize; label: string }[] = [
-  { value: 'tiny', label: 'tiny (~40 MB)' },
+  { value: 'tiny', label: 'tiny (~40 MB, default)' },
   { value: 'base', label: 'base (~80 MB)' },
   { value: 'small', label: 'small (~250 MB)' },
 ];
@@ -25,7 +26,7 @@ interface BarProps {
 
 /** One toolbar per theme. Each owns its listener, so switching themes releases the microphone. */
 function Bar({ theme, model, engine, onHeard }: BarProps & { theme: Theme }) {
-  const listener = useListener({ model, engine, theme, easterEgg: true, persistLang: true, onResult: onHeard });
+  const listener = useListener({ model, engine, theme, modelBaseUrl, easterEgg: true, persistLang: true, onResult: onHeard });
   const showPill = listener.pillVisible;
 
   if (theme === 'evinvest') {
@@ -57,7 +58,7 @@ export function App() {
   useLayoutEffect(() => {
     document.documentElement.dataset.demoTheme = theme;
   }, [theme]);
-  const [model, setModel] = useState<ModelSize>('base');
+  const [model, setModel] = useState<ModelSize>('tiny');
   const [engine, setEngine] = useState<'whisper' | 'webspeech'>('whisper');
   const [heard, setHeard] = useState<{ text: string; lang: string } | null>(null);
   const onHeard = (text: string, lang: string) => setHeard({ text, lang });
@@ -89,7 +90,7 @@ export function App() {
         {theme === 'shadcn' ? (
           <div className="demo__registry">
             The shadcn registry item, built from your own Button and the shadcn tokens:
-            <VoiceListener model={model} engine={engine} easterEgg onResult={onHeard} />
+            <VoiceListener model={model} modelBaseUrl={modelBaseUrl} engine={engine} easterEgg onResult={onHeard} />
           </div>
         ) : null}
       </section>
@@ -107,7 +108,7 @@ export function App() {
           <select
             value={model}
             disabled={engine !== 'whisper'}
-            onChange={(e) => setModel(MODELS.find((m) => m.value === e.target.value)?.value ?? 'base')}
+            onChange={(e) => setModel(MODELS.find((m) => m.value === e.target.value)?.value ?? 'tiny')}
           >
             {MODELS.map((m) => (
               <option key={m.value} value={m.value}>

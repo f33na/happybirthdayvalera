@@ -19,6 +19,8 @@ fn App() -> Element {
         easter_egg: true,
         persist_lang: true,
         theme: theme(),
+        // Self-hosted models (`just serve-models`); read at build time, so set it before `dx serve`.
+        model_base_url: option_env!("HBV_MODEL_BASE_URL").filter(|url| !url.is_empty()).map(str::to_owned),
         on_result: Some(Rc::new(move |text, lang| {
             // Signals are Copy; a local copy is mutable inside the shared Fn.
             let mut heard = heard;

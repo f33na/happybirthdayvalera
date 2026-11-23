@@ -61,7 +61,7 @@ describe('useListener', () => {
     expect(result.current.state).toBe('idle');
     act(() => result.current.start());
     await waitFor(() => expect(result.current.state).toBe('listening'));
-    expect(engine.load).toHaveBeenCalledWith('base', expect.any(Function));
+    expect(engine.load).toHaveBeenCalledWith('tiny', expect.any(Function));
     expect(result.current.progress).toBe(1);
 
     feed(0.1, 20); // speech

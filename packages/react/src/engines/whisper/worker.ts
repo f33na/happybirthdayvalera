@@ -4,6 +4,7 @@
 import { env, pipeline } from '@huggingface/transformers';
 import {
   cleanTranscript,
+  EXPECTED_MODEL_FILES,
   createProgressAggregator,
   PIPELINE_DTYPE,
   transcribeOptions,
@@ -17,13 +18,31 @@ interface Transcriber {
 
 const post = (message: WorkerResponse): void => self.postMessage(message);
 
-// Models come from the Hugging Face Hub and are kept in the browser Cache API for the next visit.
+// By default models come from the Hugging Face Hub. All of them are kept in the browser Cache API.
 env.allowLocalModels = false;
 env.useBrowserCache = true;
+const defaultLocalModelPath = env.localModelPath;
 
 let loadedModel: string | null = null;
 let transcriber: Transcriber | null = null;
 let loading: { model: string; promise: Promise<void> } | null = null;
+
+/** Self-hosted sizes: `content-length` of a `HEAD` request per expected file. A file that fails stays unknown. */
+async function fetchHostedSizes(model: string, baseUrl: string): Promise<Map<string, number>> {
+  const sizes = new Map<string, number>();
+  await Promise.all(
+    EXPECTED_MODEL_FILES.map(async (file) => {
+      try {
+        const response = await fetch(`${baseUrl}${model}/${file}`, { method: 'HEAD', signal: AbortSignal.timeout(4000) });
+        const length = Number(response.headers.get('content-length'));
+        if (response.ok && Number.isFinite(length) && length > 0) sizes.set(file, length);
+      } catch {
+        // Unknown sizes are a normal case, see above.
+      }
+    }),
+  );
+  return sizes;
+}
 
 /** File sizes from the Hub's model listing. Any failure (offline, blocked) gives an empty map: progress stays unknown. */
 async function fetchFileSizes(model: string): Promise<Map<string, number>> {
@@ -47,13 +66,20 @@ async function fetchFileSizes(model: string): Promise<Map<string, number>> {
   return sizes;
 }
 
-async function load(model: string, wasmPaths?: string): Promise<void> {
+async function load(model: string, wasmPaths?: string, modelBaseUrl?: string): Promise<void> {
   // Where onnxruntime-web fetches its .wasm and loader from; transformers.js defaults to jsDelivr.
+  // Self-hosting puts them under `<base>ort/`, and an explicit `wasmPaths` still wins.
   const wasm = env.backends.onnx.wasm;
-  if (wasmPaths && wasm) wasm.wasmPaths = wasmPaths;
+  const ortPaths = wasmPaths ?? (modelBaseUrl ? `${modelBaseUrl}ort/` : undefined);
+  if (ortPaths && wasm) wasm.wasmPaths = ortPaths;
+  // Models are read from `<base><model id>/…`, never from the Hub, when a base URL is given.
+  env.allowLocalModels = modelBaseUrl !== undefined;
+  env.allowRemoteModels = modelBaseUrl === undefined;
+  env.localModelPath = modelBaseUrl ?? defaultLocalModelPath;
   if (loadedModel === model && transcriber) return;
   if (loading?.model === model) return loading.promise;
-  const aggregate = createProgressAggregator(await fetchFileSizes(model));
+  const sizes = modelBaseUrl ? await fetchHostedSizes(model, modelBaseUrl) : await fetchFileSizes(model);
+  const aggregate = createProgressAggregator(sizes);
   const promise = (async () => {
     transcriber = null;
     loadedModel = null;
@@ -93,7 +119,7 @@ self.onmessage = (event: MessageEvent<WorkerRequest>) => {
   queue = queue.then(async () => {
     try {
       if (request.type === 'load') {
-        await load(request.model, request.wasmPaths);
+        await load(request.model, request.wasmPaths, request.modelBaseUrl);
         post({ type: 'ready' });
       } else {
         await transcribe(request.id, request.pcm, request.lang);

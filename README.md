@@ -57,13 +57,27 @@ fn Toolbar() -> Element {
 
 - **Language.** The default comes from the browser or OS locale and falls back to English. The user can switch
   it with the chip on the pill. The app can force it with a prop.
-- **Recognition.** Whisper (`base` by default) gets the language as a forced token. On the web it runs with
+- **Recognition.** Whisper (`tiny` by default) gets the language as a forced token. On the web it runs with
   transformers.js in a Web Worker. On desktop it runs with whisper.cpp through `whisper-rs`. The model
   downloads once and stays in the cache.
 - **Dictation.** The widget records while it listens and transcribes when you stop. It also stops by itself
   after about 1.5 s of silence.
 - **Pluggable.** Bring your own engine through the `SpeechEngine` interface. The React package also has a light
   Web Speech API engine that needs no model download.
+
+## Fast local models
+
+The first run downloads the Whisper model from Hugging Face, which can be slow. For local work, host the files yourself:
+
+```sh
+just fetch-models        # tiny by default: just fetch-models base
+just serve-models        # http://localhost:5299/, with CORS
+HBV_MODEL_BASE_URL=http://localhost:5299/ just stand-react-shadcn
+```
+
+The React recipes pass `HBV_MODEL_BASE_URL` to Vite. The Dioxus stands and demos read it at compile time.
+Unset, they use the Hugging Face Hub. In production, set `modelBaseUrl` to your own CDN: see the
+[React package README](packages/react/README.md#self-hosted-models).
 
 The shared contract for both libraries is in [`shared/CONTRACT.md`](shared/CONTRACT.md).
 

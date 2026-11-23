@@ -106,7 +106,9 @@ npm package and the Dioxus web build (`crates/happybirthdayvalera/assets/whisper
 Main → worker:
 
 ```ts
-{ type: 'load', model: 'onnx-community/whisper-base', wasmPaths?: string } // wasmPaths: onnxruntime wasm base URL; default is the CDN
+{ type: 'load', model: 'onnx-community/whisper-tiny', wasmPaths?: string, modelBaseUrl?: string }
+// wasmPaths: onnxruntime wasm base URL; default is the CDN.
+// modelBaseUrl: self-hosted models, ends with "/" (see "Self-hosted models")
 { type: 'transcribe', id: number, pcm: Float32Array, lang: Lang }   // pcm buffer is transferred
 ```
 
@@ -120,6 +122,28 @@ Worker → main:
 ```
 
 A second `load` with the same model answers `ready` at once.
+
+### Self-hosted models
+
+The default is the Hugging Face Hub, jsDelivr and `behavior.json` → `models.desktop.baseUrl`. An optional base URL
+replaces all three. It is `modelBaseUrl` in TypeScript (`useListener`, `whisperEngine`) and
+`model_base_url: Option<String>` in `ListenerConfig`. A missing trailing `/` is added. One root serves web and desktop:
+
+| Path | Content |
+| --- | --- |
+| `<base><hf model id>/…` | transformers.js files, for example `<base>onnx-community/whisper-tiny/onnx/encoder_model_quantized.onnx` |
+| `<base>ort/` | the onnxruntime-web `.wasm` and `.mjs` files from `@huggingface/transformers/dist` |
+| `<base>ggml-<size>.bin` | the desktop whisper.cpp files, the flat layout of `models.desktop.baseUrl` |
+
+- With `modelBaseUrl` the worker sets `env.allowLocalModels = true`, `env.localModelPath = modelBaseUrl` and
+  `env.allowRemoteModels = false`. Without it, `allowLocalModels = false` and the Hub is used.
+- With `modelBaseUrl` and no `wasmPaths`, the worker uses `<base>ort/` as `wasmPaths`. An explicit `wasmPaths` wins.
+- Progress sizes come from `HEAD` (`content-length`) of the expected model files under `<base><model id>/`, not from
+  the Hub API. A failed `HEAD` keeps the progress unknown: no fake percentage.
+- On desktop the base replaces `models.desktop.baseUrl` for the download only. The checksum check and the on-disk cache do not change.
+- The default model is `tiny` (`models.default`): about 41 MB at q8 (encoder 10.1 MB, decoder 30.7 MB). `base` and `small` stay selectable.
+- Dev tooling: `just fetch-models [size]` fills `models/hosted/`, and `just serve-models` serves it on port 5299 with CORS.
+  Stands and demos opt in with `HBV_MODEL_BASE_URL` (Vite: `VITE_HBV_MODEL_BASE_URL`; Dioxus: `option_env!`).
 
 ## Public API
 

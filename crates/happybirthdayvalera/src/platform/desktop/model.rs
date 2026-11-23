@@ -7,7 +7,7 @@ use std::time::Duration;
 
 use sha2::{Digest, Sha256};
 
-use crate::engine::{EngineError, ModelSize};
+use crate::engine::{EngineError, ModelSize, normalize_base_url};
 
 /// The LFS object of each file in `ggerganov/whisper.cpp` on Hugging Face (`main`, commit
 /// `5359861c739e955e79d9a303bcbc70fb988958b1`): `GET /api/models/ggerganov/whisper.cpp/tree/main` → `lfs`.
@@ -33,23 +33,42 @@ const fn pinned(size: ModelSize) -> Pinned {
     }
 }
 
-/// Where the whisper.cpp models live. The default is `<cache dir>/happybirthdayvalera/models`.
+/// Where the whisper.cpp models live and where a missing one downloads from. The default directory is
+/// `<cache dir>/happybirthdayvalera/models`; the default host is `behavior.json` → `models.desktop.baseUrl`.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ModelStore {
     dir: PathBuf,
+    base_url: Option<String>,
 }
 
 impl Default for ModelStore {
     fn default() -> Self {
         let base = dirs::cache_dir().unwrap_or_else(std::env::temp_dir);
-        Self { dir: base.join("happybirthdayvalera").join("models") }
+        Self { dir: base.join("happybirthdayvalera").join("models"), base_url: None }
     }
 }
 
 impl ModelStore {
     /// A store in `dir`.
     pub fn at(dir: impl Into<PathBuf>) -> Self {
-        Self { dir: dir.into() }
+        Self { dir: dir.into(), base_url: None }
+    }
+
+    /// Downloads `ggml-<size>.bin` from `<base_url>ggml-<size>.bin` instead of the Hugging Face Hub. A missing
+    /// trailing `/` is added. The file is still checked against the pinned size and SHA-256.
+    #[must_use]
+    pub fn with_base_url(mut self, base_url: impl AsRef<str>) -> Self {
+        self.base_url = Some(normalize_base_url(base_url.as_ref()));
+        self
+    }
+
+    /// The download URL of the model file.
+    #[must_use]
+    pub fn url(&self, size: ModelSize) -> String {
+        match &self.base_url {
+            Some(base) => format!("{base}{}", size.ggml_file_name()),
+            None => size.ggml_url(),
+        }
     }
 
     /// The directory of the store.
@@ -91,7 +110,7 @@ impl ModelStore {
         }
         fs::create_dir_all(&self.dir).map_err(|e| io_error("create", &self.dir, &e))?;
 
-        let url = size.ggml_url();
+        let url = self.url(size);
         let part = path.with_file_name(format!("{}.part", size.ggml_file_name()));
         tracing::info!("downloading {url} to {}", part.display());
         let agent = ureq::Agent::config_builder()
@@ -203,6 +222,15 @@ mod tests {
             assert!(pin.sha256.bytes().all(|b| b.is_ascii_hexdigit() && !b.is_ascii_uppercase()));
             assert!(pin.bytes > 10_000_000);
         }
+    }
+
+    #[test]
+    fn a_base_url_replaces_the_hub_for_the_download_only() {
+        let hub = ModelStore::at("/tmp/hbv");
+        assert_eq!(hub.url(ModelSize::Tiny), ModelSize::Tiny.ggml_url());
+        let hosted = ModelStore::at("/tmp/hbv").with_base_url("http://localhost:5299");
+        assert_eq!(hosted.url(ModelSize::Small), "http://localhost:5299/ggml-small.bin");
+        assert_eq!(hosted.path(ModelSize::Small), hub.path(ModelSize::Small));
     }
 
     #[test]

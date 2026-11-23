@@ -1,5 +1,6 @@
 import { behavior, type Lang, type ModelSize } from '../../core/data';
 import { EngineError, type SpeechEngine } from '../../core/engine';
+import { normalizeBaseUrl } from './pipeline-config';
 import { isWorkerResponse, type WorkerRequest } from './protocol';
 
 export interface WhisperEngineOptions {
@@ -15,6 +16,13 @@ export interface WhisperEngineOptions {
    * Default: the jsDelivr CDN. Set it, and cache the model files, for a fully offline app.
    */
   wasmPaths?: string;
+  /**
+   * Self-hosted models: a base URL under which `<model id>/…` holds the transformers.js model files
+   * (for example `<base>onnx-community/whisper-tiny/config.json`) and `ort/` holds the onnxruntime files.
+   * A missing trailing `/` is added. Default: the Hugging Face Hub and jsDelivr.
+   * `wasmPaths` still wins for the onnxruntime files.
+   */
+  modelBaseUrl?: string;
 }
 
 /**
@@ -108,7 +116,12 @@ export function whisperEngine(options: WhisperEngineOptions = {}): SpeechEngine 
           onProgress,
         };
         try {
-          send({ type: 'load', model: behavior.models.web[model], wasmPaths: options.wasmPaths });
+          send({
+            type: 'load',
+            model: behavior.models.web[model],
+            wasmPaths: options.wasmPaths,
+            ...(options.modelBaseUrl ? { modelBaseUrl: normalizeBaseUrl(options.modelBaseUrl) } : {}),
+          });
         } catch (error) {
           loadWaiter = null;
           reject(error instanceof Error ? error : new EngineError('model-failed', String(error)));

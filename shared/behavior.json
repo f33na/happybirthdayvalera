@@ -10,7 +10,7 @@
   "langCycle": ["en", "ru", "de", "fr"],
   "persistLangKey": "happybirthdayvalera.lang",
   "models": {
-    "default": "base",
+    "default": "tiny",
     "web": {
       "tiny": "onnx-community/whisper-tiny",
       "base": "onnx-community/whisper-base",

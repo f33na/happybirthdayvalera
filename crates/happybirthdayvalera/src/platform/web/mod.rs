@@ -6,6 +6,9 @@ mod worker;
 pub(crate) use capture::{Capture, open_capture};
 pub use worker::WorkerEngine;
 
+use std::cell::RefCell;
+use std::collections::HashMap;
+
 use wasm_bindgen::JsCast as _;
 use wasm_bindgen::prelude::Closure;
 
@@ -15,10 +18,19 @@ use crate::lang::Lang;
 thread_local! {
     // One worker per page, so every listener shares one loaded model instead of one each.
     static ENGINE: EngineHandle = EngineHandle::new(WorkerEngine::new());
+    // The same rule per self-hosted base URL: listeners that name one host share its worker.
+    static HOSTED: RefCell<HashMap<String, EngineHandle>> = RefCell::new(HashMap::new());
 }
 
-pub(crate) fn default_engine() -> EngineHandle {
-    ENGINE.with(Clone::clone)
+/// `model_base_url` arrives normalized, so one host maps to one key.
+pub(crate) fn default_engine(model_base_url: Option<String>) -> EngineHandle {
+    let Some(base) = model_base_url else { return ENGINE.with(Clone::clone) };
+    HOSTED.with_borrow_mut(|hosted| {
+        hosted
+            .entry(base)
+            .or_insert_with_key(|base| EngineHandle::new(WorkerEngine::new().model_base_url(base)))
+            .clone()
+    })
 }
 
 /// `navigator.languages`, then `navigator.language`.

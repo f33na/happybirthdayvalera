@@ -9,6 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { VoiceListener } from '@/components/voice-listener';
+import { modelBaseUrl } from './model-base-url';
 
 const initialDark = (): boolean => {
   const mode = new URLSearchParams(location.search).get('mode');
@@ -19,6 +20,7 @@ const initialDark = (): boolean => {
 function AsChildToolbar({ onText, lang, onLang }: { onText: (t: string) => void; lang: Lang; onLang: (l: Lang) => void }) {
   const listener = useListener({
     theme: 'shadcn',
+    modelBaseUrl,
     easterEgg: true,
     onResult: (text, l) => {
       onText(text);
@@ -84,7 +86,7 @@ export function App() {
                 <TabsTrigger value="aschild">MicButton asChild</TabsTrigger>
               </TabsList>
               <TabsContent value="item" className="flex items-center gap-2 pt-2">
-                <VoiceListener easterEgg persistLang onResult={(t, l) => {
+                <VoiceListener easterEgg persistLang modelBaseUrl={modelBaseUrl} onResult={(t, l) => {
                     append(t);
                     setLang(l);
                   }} />

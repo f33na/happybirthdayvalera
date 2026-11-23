@@ -8,7 +8,7 @@ import { behavior, type Lang } from '../src/core/data';
 import { PIPELINE_DTYPE, cleanTranscript, transcribeOptions } from '../src/engines/whisper/pipeline-config';
 
 const root = path.resolve(import.meta.dirname, '../../..');
-const MODEL = process.env.HBV_ACCURACY_MODEL === 'tiny' ? 'tiny' : 'base';
+const MODEL = process.env.HBV_ACCURACY_MODEL === 'base' ? 'base' : behavior.models.default;
 
 interface Expected {
   text: string;

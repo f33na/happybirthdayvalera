@@ -7,7 +7,8 @@
 //!
 //! - `open_capture(sink)`: starts the microphone and sends 16 kHz mono blocks of `BLOCK_SAMPLES` to `sink`;
 //!   dropping the returned `Capture` releases the microphone at once.
-//! - `default_engine()`: the shared engine of this thread.
+//! - `default_engine(model_base_url)`: the shared engine of this thread for that normalized model host
+//!   (`None`: the public hosts).
 //! - `preferred_locales()`, `load_lang(key)`, `store_lang(key, lang)`.
 //! - `sleep_ms(ms)`.
 

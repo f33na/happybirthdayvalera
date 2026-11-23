@@ -8,7 +8,7 @@ use dioxus::prelude::*;
 use futures_channel::mpsc::{UnboundedSender, unbounded};
 
 use crate::controller::{Controller, Message, Settings};
-use crate::engine::{EngineHandle, ModelSize};
+use crate::engine::{EngineHandle, ModelSize, normalize_base_url};
 use crate::i18n::{Msg, format};
 use crate::lang::{Lang, resolve_preferred_lang};
 use crate::machine::{ErrorCode, State};
@@ -23,7 +23,7 @@ pub type TextHandler = Rc<dyn Fn(String, Lang)>;
 /// The listener settings. [`Default`] takes every value from `behavior.json`.
 ///
 /// The hook reads the callbacks, the VAD values, `model`, `easter_egg`, `lang` and `theme` again on every
-/// render; `engine`, `persist_lang` and `preload` count only on the first render.
+/// render; `engine`, `model_base_url`, `persist_lang` and `preload` count only on the first render.
 #[derive(Clone)]
 pub struct ListenerConfig {
     /// Forces the language and hides the chip.
@@ -34,6 +34,16 @@ pub struct ListenerConfig {
     pub engine: Option<EngineHandle>,
     /// The Whisper model size.
     pub model: ModelSize,
+    /// Self-hosted models: the default engine loads every file from this base URL instead of the Hugging Face
+    /// Hub and jsDelivr. A missing trailing `/` is added. The layout under it:
+    ///
+    /// - `<base><model id>/…`: the transformers.js model files (web), for example
+    ///   `<base>onnx-community/whisper-tiny/config.json`;
+    /// - `<base>ort/`: the onnxruntime-web `.wasm` and `.mjs` files (web);
+    /// - `<base>ggml-<size>.bin`: the whisper.cpp files (desktop), still checked against the pinned SHA-256.
+    ///
+    /// `None` keeps the public hosts. Ignored when `engine` is set.
+    pub model_base_url: Option<String>,
     /// Fires once per non-empty final text.
     pub on_result: Option<TextHandler>,
     /// Fires for each interim text when `interim_every_ms > 0`.
@@ -66,6 +76,7 @@ impl Default for ListenerConfig {
             persist_lang: false,
             engine: None,
             model: ModelSize::default(),
+            model_base_url: None,
             on_result: None,
             on_interim: None,
             interim_every_ms: BEHAVIOR.interim_every_ms,
@@ -87,6 +98,7 @@ impl std::fmt::Debug for ListenerConfig {
             .field("lang", &self.lang)
             .field("persist_lang", &self.persist_lang)
             .field("model", &self.model)
+            .field("model_base_url", &self.model_base_url)
             .field("interim_every_ms", &self.interim_every_ms)
             .field("silence_ms", &self.silence_ms)
             .field("easter_egg", &self.easter_egg)
@@ -321,7 +333,10 @@ pub fn use_listener(config: ListenerConfig) -> Listener {
 
     let tx = use_hook(|| {
         let (tx, rx) = unbounded();
-        let engine = config.engine.clone().unwrap_or_else(platform::default_engine);
+        let engine = config
+            .engine
+            .clone()
+            .unwrap_or_else(|| platform::default_engine(config.model_base_url.as_deref().map(normalize_base_url)));
         let controller = Controller::new(id, &sig, settings, engine, tx.clone());
         // The task belongs to this component's scope; Dioxus drops it, and with it the capture, on unmount.
         spawn(controller.run(rx, config.preload));

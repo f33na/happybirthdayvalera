@@ -5,7 +5,6 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::{Rc, Weak};
 
-//  with options expands to paths under , which the prelude re-exports.
 // `asset!` with options expands to paths under `manganis`, which the prelude re-exports.
 use dioxus::prelude::{Asset, AssetOptions, asset, manganis};
 use futures_channel::mpsc::{UnboundedSender, unbounded};
@@ -16,7 +15,7 @@ use wasm_bindgen::prelude::Closure;
 use wasm_bindgen::{JsCast as _, JsValue};
 use web_sys::{ErrorEvent, MessageEvent, Worker, WorkerOptions, WorkerType};
 
-use crate::engine::{EngineError, ModelSize, SpeechEngine};
+use crate::engine::{EngineError, ModelSize, SpeechEngine, normalize_base_url};
 use crate::lang::Lang;
 
 /// The worker is a finished ES module from the TS build, so `dx` must ship it byte for byte under a hashed name.
@@ -64,6 +63,7 @@ impl Inner {
 pub struct WorkerEngine {
     url: String,
     wasm_paths: Option<String>,
+    model_base_url: Option<String>,
     inner: Rc<RefCell<Inner>>,
 }
 
@@ -82,13 +82,22 @@ impl WorkerEngine {
 
     /// An engine over a worker script that speaks the same protocol.
     pub fn with_worker_url(url: impl Into<String>) -> Self {
-        Self { url: url.into(), wasm_paths: None, inner: Rc::default() }
+        Self { url: url.into(), wasm_paths: None, model_base_url: None, inner: Rc::default() }
     }
 
     /// Sends `wasmPaths` (the base URL of the onnxruntime wasm files) with every `load`, for offline hosts.
     #[must_use]
     pub fn wasm_paths(mut self, base_url: impl Into<String>) -> Self {
         self.wasm_paths = Some(base_url.into());
+        self
+    }
+
+    /// Sends `modelBaseUrl` with every `load`: the worker reads the model files from
+    /// `<base><model id>/` and, unless [`Self::wasm_paths`] is set, the onnxruntime files from `<base>ort/`.
+    /// A missing trailing `/` is added.
+    #[must_use]
+    pub fn model_base_url(mut self, base_url: impl AsRef<str>) -> Self {
+        self.model_base_url = Some(normalize_base_url(base_url.as_ref()));
         self
     }
 
@@ -195,6 +204,9 @@ impl SpeechEngine for WorkerEngine {
                 set(&msg, "model", &JsValue::from_str(model_id));
                 if let Some(paths) = &self.wasm_paths {
                     set(&msg, "wasmPaths", &JsValue::from_str(paths));
+                }
+                if let Some(base) = &self.model_base_url {
+                    set(&msg, "modelBaseUrl", &JsValue::from_str(base));
                 }
                 if let Err(e) = worker.post_message(&msg) {
                     inner.fail_all(&format!("cannot post `load`: {e:?}"));

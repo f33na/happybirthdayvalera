@@ -19,6 +19,10 @@ so the `ev_uikit` feature of the crate needs a nightly toolchain or `RUSTC_BOOTS
 `RUSTC_BOOTSTRAP=1`, so the stable toolchain builds them. Without it, the build fails with E0554. This
 stays so until EV-Main/web_std drops that feature from both crates. The real `listener.css` and `whisper-worker.js` come from `just sync-assets`.
 
+To load the models from a local host instead of the Hugging Face Hub, run `just fetch-models` and
+`just serve-models`, then start the stand with `HBV_MODEL_BASE_URL=http://localhost:5299/`. The stand reads
+the variable at build time.
+
 ## What it proves
 
 - The `ev_uikit` feature of the crate works in a real host: `EvMicButton` wears the kit's
