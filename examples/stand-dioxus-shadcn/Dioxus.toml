@@ -1,0 +1,5 @@
+[application]
+name = "stand-dioxus-shadcn"
+
+[web.app]
+title = "Voice dictation — Dioxus + shadcn/ui stand"
