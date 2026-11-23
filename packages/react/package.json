@@ -2,7 +2,14 @@
   "name": "happybirthdayvalera",
   "version": "0.1.0",
   "description": "A voice-input widget for React: mic button, animated waveform pill and local Whisper speech-to-text in en, ru, de and fr.",
-  "keywords": ["speech-to-text", "voice-input", "whisper", "transformers.js", "react", "waveform"],
+  "keywords": [
+    "speech-to-text",
+    "voice-input",
+    "whisper",
+    "transformers.js",
+    "react",
+    "waveform"
+  ],
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -10,20 +17,36 @@
     "directory": "packages/react"
   },
   "type": "module",
-  "sideEffects": ["**/*.css"],
+  "sideEffects": [
+    "**/*.css"
+  ],
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
   "types": "./dist/types/index.d.ts",
   "exports": {
     ".": {
-      "import": { "types": "./dist/types/index.d.ts", "default": "./dist/index.js" },
-      "require": { "types": "./dist/types/index.d.ts", "default": "./dist/index.cjs" }
+      "import": {
+        "types": "./dist/types/index.d.ts",
+        "default": "./dist/index.js"
+      },
+      "require": {
+        "types": "./dist/types/index.d.ts",
+        "default": "./dist/index.cjs"
+      }
+    },
+    "./evinvest": {
+      "import": { "types": "./dist/types/evinvest/index.d.ts", "default": "./dist/evinvest.js" },
+      "require": { "types": "./dist/types/evinvest/index.d.ts", "default": "./dist/evinvest.cjs" }
     },
     "./style.css": "./dist/style.css",
     "./whisper-worker.js": "./dist/whisper-worker.js",
     "./package.json": "./package.json"
   },
-  "files": ["dist", "README.md", "LICENSE"],
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
   "scripts": {
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "lint": "eslint .",
@@ -32,10 +55,15 @@
     "build": "node scripts/build.mjs"
   },
   "peerDependencies": {
+    "@evinvest/uikit": ">=0.36 <1",
     "react": "^18.0.0 || ^19.0.0"
+  },
+  "peerDependenciesMeta": {
+    "@evinvest/uikit": { "optional": true }
   },
   "devDependencies": {
     "@eslint/js": "^9.39.0",
+    "@evinvest/uikit": "^0.36.1",
     "@huggingface/transformers": "3.8.1",
     "@testing-library/react": "^16.3.0",
     "@types/node": "^22.0.0",
@@ -47,6 +75,7 @@
     "jsdom": "^26.0.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
+    "shadcn": "^4.23.0",
     "typescript": "~5.9.0",
     "typescript-eslint": "^8.40.0",
     "vite": "^7.0.0",

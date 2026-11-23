@@ -27,7 +27,8 @@ let loading: { model: string; promise: Promise<void> } | null = null;
 
 async function load(model: string, wasmPaths?: string): Promise<void> {
   // Where onnxruntime-web fetches its .wasm and loader from; transformers.js defaults to jsDelivr.
-  if (wasmPaths) env.backends.onnx.wasm.wasmPaths = wasmPaths;
+  const wasm = env.backends.onnx.wasm;
+  if (wasmPaths && wasm) wasm.wasmPaths = wasmPaths;
   if (loadedModel === model && transcriber) return;
   if (loading?.model === model) return loading.promise;
   const aggregate = createProgressAggregator();

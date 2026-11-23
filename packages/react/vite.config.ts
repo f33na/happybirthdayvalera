@@ -33,12 +33,13 @@ export default defineConfig({
     minify: false,
     emptyOutDir: true,
     lib: {
-      entry: 'src/index.ts',
+      // The kit adapter is its own entry, so the main entry never pulls in the optional peer.
+      entry: { index: 'src/index.ts', evinvest: 'src/evinvest/index.tsx' },
       formats: ['es', 'cjs'],
-      fileName: (format) => (format === 'es' ? 'index.js' : 'index.cjs'),
+      fileName: (format, entry) => `${entry}.${format === 'es' ? 'js' : 'cjs'}`,
     },
     rollupOptions: {
-      external: ['react', 'react/jsx-runtime', 'react-dom'],
+      external: ['react', 'react/jsx-runtime', 'react-dom', '@evinvest/uikit'],
       // Next.js App Router: the hooks and components below must run on the client.
       output: { banner: '"use client";' },
     },
