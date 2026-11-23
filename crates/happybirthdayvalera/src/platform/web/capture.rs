@@ -106,7 +106,10 @@ async fn connect(stream: &MediaStream, sink: UnboundedSender<Vec<f32>>) -> Resul
         let _ = context.close();
     }
     let (node, on_block) = result?;
-    Ok(Capture { stream: stream.clone(), context, node, _on_block: on_block })
+    // `Clone::clone` copies the JS handle. The inherent `MediaStream::clone` would call the JS `clone()` and
+    // create new tracks, so `Drop` would stop those while the getUserMedia track, and the browser's mic
+    // indicator, stayed live. clippy.toml bans the inherent method in this crate.
+    Ok(Capture { stream: Clone::clone(stream), context, node, _on_block: on_block })
 }
 
 async fn build_graph(
