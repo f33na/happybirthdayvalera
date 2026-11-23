@@ -20,7 +20,7 @@
 }
 
 /* shadcn neutral, dark. Scoped, so the other themes keep their own values. */
-[data-demo-theme='shadcn'] {
+html[data-demo-theme='shadcn'] {
   --radius: 0.625rem;
   --background: oklch(0.145 0 0);
   --foreground: oklch(0.985 0 0);
@@ -46,7 +46,7 @@
 
 :root {
   color-scheme: dark;
-  --demo-bg: #0f0d15;
+  --demo-page: radial-gradient(120% 80% at 50% 0%, #1d1830 0%, #0f0d15 60%);
   --demo-surface: #17141f;
   --demo-text: #ece8f6;
   --demo-muted: #9a93ad;
@@ -55,7 +55,8 @@
 
 body {
   margin: 0;
-  background: radial-gradient(120% 80% at 50% 0%, #1d1830 0%, var(--demo-bg) 60%);
+  min-height: 100dvh;
+  background: var(--demo-page);
   color: var(--demo-text);
 }
 
@@ -177,4 +178,19 @@ body {
   margin: 32px 0 0;
   font-size: 13px;
   color: var(--demo-muted);
+}
+
+/* The page wears the host tokens of the active theme, so the switcher shows what the presets inherit from. */
+html[data-demo-theme='shadcn'] {
+  --demo-page: var(--background);
+  --demo-surface: var(--card);
+  --demo-text: var(--foreground);
+  --demo-muted: var(--muted-foreground);
+}
+
+html[data-demo-theme='evinvest'] {
+  --demo-page: var(--background);
+  --demo-surface: var(--secondary);
+  --demo-text: var(--ink);
+  --demo-muted: var(--ink-mid);
 }

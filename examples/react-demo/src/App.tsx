@@ -1,7 +1,7 @@
 import { ListenerPill, MicButton, useListener, type ModelSize, type Theme } from 'happybirthdayvalera';
 import 'happybirthdayvalera/style.css';
 import { EvListenerPill, EvMicButton } from 'happybirthdayvalera/evinvest';
-import { useState } from 'react';
+import { useLayoutEffect, useState } from 'react';
 import { VoiceListener } from '../../../registry/voice-listener/voice-listener';
 import { Button } from '@/components/ui/button';
 
@@ -26,7 +26,7 @@ interface BarProps {
 /** One toolbar per theme. Each owns its listener, so switching themes releases the microphone. */
 function Bar({ theme, model, engine, onHeard }: BarProps & { theme: Theme }) {
   const listener = useListener({ model, engine, theme, easterEgg: true, persistLang: true, onResult: onHeard });
-  const showPill = listener.state !== 'idle' || listener.nothingHeard;
+  const showPill = listener.pillVisible;
 
   if (theme === 'evinvest') {
     return (
@@ -53,13 +53,17 @@ function Bar({ theme, model, engine, onHeard }: BarProps & { theme: Theme }) {
 export function App() {
   // `?theme=shadcn` opens a theme directly, which also makes the page easy to check in a headless browser.
   const [theme, setTheme] = useState<Theme>(() => THEMES.find((t) => t.value === new URLSearchParams(location.search).get('theme'))?.value ?? 'default');
+  // The attribute sits on <html>, so the theme paints the whole page, not only <main>.
+  useLayoutEffect(() => {
+    document.documentElement.dataset.demoTheme = theme;
+  }, [theme]);
   const [model, setModel] = useState<ModelSize>('base');
   const [engine, setEngine] = useState<'whisper' | 'webspeech'>('whisper');
   const [heard, setHeard] = useState<{ text: string; lang: string } | null>(null);
   const onHeard = (text: string, lang: string) => setHeard({ text, lang });
 
   return (
-    <main className="demo" data-demo-theme={theme}>
+    <main className="demo">
       <h1>happybirthdayvalera</h1>
       <p className="demo__hint">
         Tap the microphone and say something. Try “Happy birthday, Valera”, in any of the four languages.

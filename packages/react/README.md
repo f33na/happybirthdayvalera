@@ -26,7 +26,7 @@ export function Toolbar() {
   return (
     <>
       <MicButton listener={listener} />
-      {listener.state !== 'idle' && <ListenerPill listener={listener} />}
+      {listener.pillVisible && <ListenerPill listener={listener} />}
     </>
   );
 }
@@ -55,8 +55,12 @@ The language is the forced `lang`, then the stored choice (with `persistLang`), 
 It is also the recognition language, and the language of every string in the widget.
 
 The hook returns `state`, `error`, `progress` (0 to 1), `text`, `interim`, `lang`, `setLang`, `cycleLang`,
-`start`, `stop`, `toggle`, `reset`, `celebrating`, `levelRef` and `theme`. It also returns two flags that the pill
-needs: `nothingHeard` (the last recording had no speech) and `langLocked` (`lang` is forced).
+`start`, `stop`, `toggle`, `reset`, `celebrating`, `levelRef` and `theme`. It also returns three values that the pill
+needs: `nothingHeard` (the last recording had no speech), `langLocked` (`lang` is forced) and `pillVisible`.
+
+Mount the pill on `pillVisible`, not on `state !== 'idle'`. The easter egg is shown while the state is `idle`,
+so a pill that hides in `idle` never shows it. `progress` is a fraction, or `null` while the size of a model file
+is unknown; the status then reads "Loading model…" and never shows a made-up percent.
 `useListener` renders nothing, so you can build your own UI on it.
 
 `levelRef.current` is the smoothed input level from 0 to 1. It changes every frame and never causes a

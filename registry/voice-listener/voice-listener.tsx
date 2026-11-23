@@ -38,21 +38,27 @@ export function VoiceListener({ className, ...options }: VoiceListenerProps) {
 
   return (
     <div className={cn('inline-flex items-center gap-2', className)}>
-      {state !== 'idle' || listener.nothingHeard ? (
+      {listener.pillVisible ? (
         <div
           role="group"
           aria-label={t(lang, 'label.widget')}
           data-state={state}
+          data-celebrate={celebrating ? 'true' : 'false'}
           className={cn(
             'bg-popover text-popover-foreground inline-flex h-12 max-w-full items-center gap-2.5 rounded-full border px-3.5 text-sm font-medium shadow-md',
             state === 'error' && 'text-destructive',
-            celebrating && 'motion-safe:animate-bounce',
+            celebrating && 'ring-chart-2 ring-2 motion-safe:animate-pulse',
           )}
         >
-          <Waveform state={state} levelRef={levelRef} className={cn('h-7 w-[72px] shrink-0 overflow-visible', STRANDS)} />
+          <Waveform state={state} levelRef={levelRef} celebrating={celebrating} className={cn('h-7 w-[72px] shrink-0 overflow-visible', STRANDS)} />
           <span aria-live="polite" className="truncate">
             {statusText(listener)}
           </span>
+          {(state === 'listening' || state === 'transcribing' ? listener.interim : listener.text) ? (
+            <span className="text-muted-foreground max-w-64 truncate">
+              {state === 'listening' || state === 'transcribing' ? listener.interim : listener.text}
+            </span>
+          ) : null}
           <span aria-hidden="true" className="flex shrink-0 items-center gap-1">
             {[0, 1, 2].map((i) => (
               <i
