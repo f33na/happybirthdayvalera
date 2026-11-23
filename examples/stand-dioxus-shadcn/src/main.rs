@@ -106,8 +106,8 @@ fn App() -> Element {
                     CardFooter { class: "flex-wrap gap-3",
                         MicButton {
                             listener,
-                            // listener.css is not in a cascade layer, so a Tailwind utility needs `!` to beat it.
-                            class: "[--hbv-size-mic:2.25rem]!",
+                            // The widget CSS sits in `@layer components`, so a plain utility beats it.
+                            class: "[--hbv-size-mic:2.25rem]",
                             class_names: MicClassNames { icon: "size-4".into(), ..Default::default() },
                         }
                         if listener.pill_visible() {
