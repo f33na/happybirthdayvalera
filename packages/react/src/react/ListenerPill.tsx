@@ -18,7 +18,8 @@ export interface ListenerPillProps {
   components?: { LangButton?: ComponentType<LangButtonProps> };
 }
 
-function statusText(listener: Listener): string {
+/** The status line of the pill, in the listener's language. For hosts that draw their own pill. */
+export function statusText(listener: Listener): string {
   const { state, lang, error, progress, nothingHeard } = listener;
   switch (state) {
     case 'error':
