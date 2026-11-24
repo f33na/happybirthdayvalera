@@ -1,11 +1,34 @@
 # happybirthdayvalera
 
-> **For Valera, on your birthday.** May everything you say be heard, and understood, in every language you
-> speak.
+[![crates.io](https://img.shields.io/crates/v/happybirthdayvalera)](https://crates.io/crates/happybirthdayvalera)
+[![docs.rs](https://img.shields.io/docsrs/happybirthdayvalera)](https://docs.rs/happybirthdayvalera)
+[![npm](https://img.shields.io/npm/v/happybirthdayvalera)](https://www.npmjs.com/package/happybirthdayvalera)
+[![license: MIT](https://img.shields.io/badge/license-MIT-blue)](https://github.com/f33na/happybirthdayvalera/blob/24e9da2ba89ed055e547bd908d9eb5d1a4d6014f/LICENSE)
+[![CI](https://github.com/f33na/happybirthdayvalera/actions/workflows/ci.yml/badge.svg)](https://github.com/f33na/happybirthdayvalera/actions/workflows/ci.yml)
 
-Voice input for [Dioxus](https://dioxuslabs.com) 0.7: a mic button and a dark pill with a live three-strand
-waveform, a localized status and a language chip. It does real speech-to-text in **English, Russian, German
-and French** with Whisper, and it runs **locally**. No audio leaves the device.
+**Voice dictation for [Dioxus](https://dioxuslabs.com) 0.7: a mic button, a live waveform pill and local Whisper, on the web and on the desktop.**
+
+> For Valera, on your birthday 🎂 May everything you say be heard, and understood, in every language you speak.
+
+<p align="center"><img src="https://raw.githubusercontent.com/f33na/happybirthdayvalera/24e9da2ba89ed055e547bd908d9eb5d1a4d6014f/docs/media/live-dictation-ru-dioxus.gif" width="560" alt="A dark Dioxus stand: the user dictates a Russian sentence into the message field, and the pill celebrates a birthday wish with a rainbow"></p>
+
+## Why
+
+- **Local Whisper.** Speech-to-text runs on the user's device: whisper.cpp on desktop, transformers.js in a Web Worker on the web. No audio leaves the device.
+- **Text flows while you speak.** `use_dictation` writes a draft of the current phrase into your `<textarea>` or `<input>`, and replaces it in place with the final text.
+- **Four languages.** English, Russian, German and French. The language is forced, so Whisper does not guess it.
+- **Fits your design system.** Presets for shadcn/ui and the evinvest uikit, CSS variables, class maps and headless helpers.
+- **Fast on the web.** In Chrome on an Apple M2, one phrase takes about 0.5 s with `tiny` on wasm threads, and 0.3–0.4 s with `base` on WebGPU. These numbers come from the [React package](https://www.npmjs.com/package/happybirthdayvalera), which ships the same worker. See [Faster web inference](#faster-web-inference-cross-origin-isolation).
+
+## Install
+
+```sh
+cargo add happybirthdayvalera --features web       # or: --features desktop
+```
+
+Pick the feature that matches your Dioxus renderer. See [Features](#features).
+
+## Quick start
 
 ```rust,ignore
 use dioxus::prelude::*;
@@ -27,8 +50,7 @@ fn Toolbar() -> Element {
 }
 ```
 
-To dictate into a text field, use `use_dictation` instead. It returns the same `Listener` and writes the text
-into the `<textarea>` or `<input>` with that id, so you write no glue code:
+To dictate into a text field, use `use_dictation` instead. It returns the same `Listener` and writes the text into the `<textarea>` or `<input>` with that id, so you write no glue code:
 
 ```rust,ignore
 let mut message = use_signal(String::new);
@@ -38,6 +60,46 @@ rsx! {
     MicButton { listener }
 }
 ```
+
+## How it feels
+
+<img src="https://raw.githubusercontent.com/f33na/happybirthdayvalera/24e9da2ba89ed055e547bd908d9eb5d1a4d6014f/docs/media/pill-states.png" alt="The mic button and the pill in four states: idle, loading model 50%, listening, and celebrating with a rainbow waveform">
+
+- **Tap** the mic to start. The microphone stays on until a second tap, `Esc`, or 8 s without speech.
+- **Pause** for 0.7 s and the phrase goes to Whisper in the background, while you keep talking.
+- **Hold** the mic longer than 300 ms to talk only while you hold it.
+- **Cmd/Ctrl+Z** removes the last phrase in a bound field. Details are in [Behaviour](#behaviour).
+
+<img src="https://raw.githubusercontent.com/f33na/happybirthdayvalera/24e9da2ba89ed055e547bd908d9eb5d1a4d6014f/docs/media/hold-to-talk.gif" width="560" alt="Hold to talk: the user presses and holds the mic in a dark stand, speaks, and releases">
+
+Whisper writes sound tags such as `[BLANK_AUDIO]`, `(laughs)` or `*applause*`, and on silence it can invent a stock phrase such as "Thank you for watching". The crate removes the tags and drops a text that is only a known phrase. A real sentence that contains "thank you" stays (`src/clean.rs`). The list is `hallucinations` in `behavior.json`.
+
+## Configuration
+
+`ListenerConfig::default()` takes its values from `behavior.json`.
+
+| Field | Default | Meaning |
+| --- | --- | --- |
+| `lang` | detected | Force a language; the chip is hidden. |
+| `persist_lang` | `false` | Web: remember the chip choice in `localStorage`. |
+| `engine` | platform default | Your own `EngineHandle`. |
+| `model` | `ModelSize::Tiny` | `Tiny`, `Base` or `Small`. |
+| `model_base_url` | `None` | Self-hosted models. See [Self-hosted models](#self-hosted-models). |
+| `device` | `Device::Auto` | Web: `Auto`, `Webgpu` or `Wasm`. |
+| `mode` | `Mode::Continuous` | `Continuous` or `Utterance`. |
+| `on_result` / `on_interim` | `None` | Final text per segment; draft text. |
+| `interim_every_ms` | `1000` | Draft interval; `0` turns drafts off. |
+| `segment_silence_ms` | `700` | A pause that ends a segment. |
+| `auto_stop_ms` | `8000` | No speech for this long stops listening. |
+| `segment_pad_before_ms` / `segment_pad_after_ms` | `200` / `300` | Audio kept around the speech. |
+| `max_segment_ms` | `28000` | A longer segment is cut. |
+| `silence_ms` | `1500` | `Utterance`: silence that ends the recording. |
+| `hold_ms` | `300` | A longer press is hold to talk. |
+| `easter_egg` | `false` | Celebrate a birthday phrase. |
+| `preload` | `false` | Load the model on mount. |
+| `theme` | `Theme::Default` | `Default`, `Shadcn` or `Evinvest`. |
+
+`ListenerConfig` also has `min_speech_ms`, `vad_threshold_rms`, `max_duration_ms` and `easter_egg_ms`.
 
 ## Features
 
@@ -73,7 +135,7 @@ the ALSA headers (`libasound2-dev`).
 ## Models
 
 The default model is Whisper `tiny`; set `ListenerConfig::model` to `ModelSize::Base` or `ModelSize::Small` for
-better accuracy at a larger download.
+better accuracy at a larger download. Download sizes (`engine.rs`): `tiny` about 41 MB on the web (q8) and 78 MB on desktop; `base` about 77 MB on the web and 148 MB on desktop; `small` about 466 MB.
 
 - **Desktop** downloads `ggml-<size>.bin` from `huggingface.co/ggerganov/whisper.cpp` on the first `START` into
   `<cache dir>/happybirthdayvalera/models`. The pill shows the progress. The file is written to a `.part` file,
@@ -160,6 +222,14 @@ macOS asks for microphone access on the first capture. A bundled desktop app nee
   (denied on macOS, unavailable elsewhere), not "Didn't catch that". A quiet room through a working
   microphone is never bit-exact zero, so it still ends in "Didn't catch that".
 
+## Privacy
+
+With the default engines, audio is processed on the device and never uploaded. The web engine downloads model files from the Hugging Face Hub and onnxruntime files from jsDelivr, unless you set `model_base_url`. The desktop engine downloads one `ggml` file on first use.
+
+## Browser support
+
+The web build was tested in Chrome on an Apple M2. Safari and Firefox are not verified, in particular Cmd/Ctrl+Z for dictated text and WebGPU. The page needs cross-origin isolation for wasm threads.
+
 ## Troubleshooting
 
 - **macOS says the microphone is denied, but you never saw a dialog.** macOS asks once per app and remembers
@@ -174,7 +244,20 @@ macOS asks for microphone access on the first capture. A bundled desktop app nee
   microphone = { description = "Turns your speech into text on this device." }
   ```
 
-## Theming
+## Themes and design systems
+
+<table>
+  <tr>
+    <td><img src="https://raw.githubusercontent.com/f33na/happybirthdayvalera/24e9da2ba89ed055e547bd908d9eb5d1a4d6014f/docs/media/stand-dioxus-shadcn-dark-listening.png" alt="Dioxus stand with the shadcn look, dark theme, the pill listening with a green glow"></td>
+    <td><img src="https://raw.githubusercontent.com/f33na/happybirthdayvalera/24e9da2ba89ed055e547bd908d9eb5d1a4d6014f/docs/media/stand-dioxus-evinvest-light-listening.png" alt="Dioxus stand with ev_lib uikit, light theme, the pill listening"></td>
+  </tr>
+  <tr>
+    <td><img src="https://raw.githubusercontent.com/f33na/happybirthdayvalera/24e9da2ba89ed055e547bd908d9eb5d1a4d6014f/docs/media/stand-react-shadcn-light-listening.png" alt="React stand with shadcn/ui, light theme, the pill listening and the dictated text in the textarea"></td>
+    <td><img src="https://raw.githubusercontent.com/f33na/happybirthdayvalera/24e9da2ba89ed055e547bd908d9eb5d1a4d6014f/docs/media/stand-react-evinvest-dark-listening.png" alt="React stand with @evinvest/uikit, dark theme, the pill listening and the dictated text in the textarea"></td>
+  </tr>
+</table>
+
+Top row: Dioxus stands (this crate). Bottom row: the React flavour, [on npm](https://www.npmjs.com/package/happybirthdayvalera).
 
 - `ListenerConfig::theme` (`Theme::Default`, `Theme::Shadcn`, `Theme::Evinvest`) renders as
   `data-hbv-theme`; the stylesheet maps the presets to the host's CSS variables. Each component can override
@@ -182,6 +265,9 @@ macOS asks for microphone access on the first capture. A bundled desktop app nee
 - `class` and `class_names` (`MicClassNames`, `PillClassNames`) add host classes after the contract classes.
 - Headless helpers for your own markup: `mic_button_props`, `pill_props`, `wave_path`, `t`, `MicParts` and
   the standalone `Waveform`.
+
+
+With the cargo feature `ev_uikit`, `EvMicButton` and `EvListenerPill` use the evinvest uikit. See [Features](#features).
 
 ## Your own engine
 
@@ -203,6 +289,10 @@ impl SpeechEngine for Echo {
     }
 }
 ```
+
+## Design note
+
+The pill is an original design. It is inspired by voice inputs in general, and it uses no code, assets or copy from any other product (clean-room).
 
 ## License
 
