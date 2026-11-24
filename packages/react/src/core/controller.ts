@@ -11,6 +11,7 @@ import {
 } from './machine';
 import { MicError, openMic, type MicBlock, type MicHandle } from './mic';
 import { Segmenter } from './segmenter';
+import { cleanTranscript } from './transcript';
 import { createVad, type Vad } from './vad';
 import { smoothLevel } from './wave';
 
@@ -317,7 +318,8 @@ export class ListenerController {
         // is still the newest text of a segment that is not committed: with a slow model it is the only draft.
         const { state } = this.snap;
         if (id !== this.session || (state !== 'listening' && state !== 'transcribing') || this.resolved > seq) return;
-        const draft = text.trim();
+        // An empty draft (silence, a sound tag) keeps the previous draft on screen.
+        const draft = cleanTranscript(text);
         if (!draft) return;
         this.update({ interim: draft });
         this.sink?.draft(draft);
@@ -357,7 +359,7 @@ export class ListenerController {
       .then((text) => {
         if (id !== this.session) return;
         this.resolved++;
-        this.commit(text.trim(), cfg);
+        this.commit(cleanTranscript(text), cfg);
       })
       .catch(() => {
         if (id !== this.session) return;

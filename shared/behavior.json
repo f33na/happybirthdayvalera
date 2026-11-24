@@ -14,6 +14,22 @@
   "interimEveryMs": 1000,
   "holdMs": 300,
   "easterEggMs": 3000,
+  "hallucinations": [
+    "субтитры сделал dimatorzok",
+    "субтитры создавал dimatorzok",
+    "редактор субтитров а синецкая корректор а егорова",
+    "продолжение следует",
+    "спасибо за просмотр",
+    "thank you for watching",
+    "thanks for watching",
+    "thank you",
+    "untertitel der amara org community",
+    "untertitel im auftrag des zdf",
+    "vielen dank fürs zuschauen",
+    "sous titrage st 501",
+    "sous titres réalisés par la communauté d amara org",
+    "merci d avoir regardé"
+  ],
   "langCycle": ["en", "ru", "de", "fr"],
   "persistLangKey": "happybirthdayvalera.lang",
   "models": {

@@ -113,6 +113,23 @@ The default `mode` is `continuous`. The old behaviour, one utterance and then st
   late draft is often the only one. `onInterim(text, lang)` fires for every non-empty draft.
 - In `utterance` mode drafts work the same way over the single utterance.
 
+
+### Non-speech output
+
+Whisper writes sound tags such as `[BLANK_AUDIO]`, `[Music]`, `(смеется)` or `*applause*` for audio without
+speech, and on silence it can invent stock phrases from subtitles ("Субтитры сделал DimaTorzok", "Thank you
+for watching"). None of this may reach the user, as a draft or as committed text. Both libraries clean every
+engine result, draft or final, the same way:
+
+1. Remove every span in square brackets `[...]`, in parentheses `(...)` and between asterisks `*...*`, and every
+   `♪` and `♫`. Collapse whitespace and trim.
+2. If what is left has no letter and no digit, the result is empty.
+3. Normalize the text as for the easter egg. If the whole normalized text equals a phrase in
+   `behavior.json` → `hallucinations`, the result is empty. A phrase inside longer text stays.
+
+An empty draft is not shown (the previous draft of the segment stays). An empty final segment commits nothing,
+as before. The desktop engine also sets whisper.cpp's `suppress_blank` and `suppress_non_speech_tokens`.
+
 ### Hold to talk
 
 - Pointer down on the mic and hold longer than `holdMs`: the widget listens while the pointer is down. Pointer

@@ -369,3 +369,44 @@ describe('hold to talk', () => {
     expect(t.state().state).toBe('idle');
   });
 });
+
+describe('non-speech output', () => {
+  it('keeps the previous draft when a draft is only a sound tag', async () => {
+    const t = setup({ interimEveryMs: 1000 });
+    await t.listen();
+    feed(LOUD, 50);
+    vi.advanceTimersByTime(1000);
+    t.calls[0]?.resolve('happy birth');
+    await settle();
+    vi.advanceTimersByTime(1000);
+    t.calls[1]?.resolve(' [BLANK_AUDIO] ');
+    await settle();
+    expect(t.state().interim).toBe('happy birth');
+    expect(t.onInterim).toHaveBeenCalledTimes(1);
+    expect(t.events).toEqual(['begin', 'draft:happy birth']);
+  });
+
+  it('commits nothing for a final that is only a sound tag or a stock phrase, and drops its draft', async () => {
+    const t = setup({ interimEveryMs: 1000 });
+    await t.listen();
+    feed(LOUD, 20);
+    vi.advanceTimersByTime(1000);
+    t.calls[0]?.resolve('thank');
+    await settle();
+    feed(QUIET, 35); // the segment closes
+    await settle();
+    t.calls[1]?.resolve('Thank you.');
+    await settle();
+    expect(t.state().text).toBe('');
+    expect(t.state().interim).toBe('');
+    expect(t.onResult).not.toHaveBeenCalled();
+    expect(t.events).toEqual(['begin', 'draft:thank', 'clear']);
+
+    t.segment();
+    await settle();
+    t.calls[2]?.resolve('[BLANK_AUDIO] привет');
+    await settle();
+    expect(t.state().text).toBe('привет');
+    expect(t.events.at(-1)).toBe('commit:привет');
+  });
+});

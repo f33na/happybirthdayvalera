@@ -1,5 +1,6 @@
 #![doc = include_str!("../README.md")]
 
+mod clean;
 mod components;
 mod controller;
 mod dictation;

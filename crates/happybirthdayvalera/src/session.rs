@@ -6,6 +6,7 @@
 
 use std::collections::VecDeque;
 
+use crate::clean::clean_transcript;
 use crate::engine::EngineError;
 use crate::listener::Mode;
 use crate::resample::TARGET_RATE;
@@ -278,10 +279,11 @@ impl Session {
                 let current = job.segment >= self.next_commit;
                 match result {
                     Ok(text) if current => {
-                        let text = text.trim();
+                        // An empty draft keeps the previous one: silence must not blank what was said.
+                        let text = clean_transcript(&text);
                         if !text.is_empty() {
                             self.interim_segment = Some(job.segment);
-                            fx.push(Effect::Interim { segment: job.segment, text: text.to_owned() });
+                            fx.push(Effect::Interim { segment: job.segment, text });
                         }
                     }
                     Ok(_) => {}
@@ -358,13 +360,13 @@ impl Session {
         self.next_commit = segment.wrapping_add(1);
         match result {
             Ok(text) => {
-                let text = text.trim();
+                let text = clean_transcript(&text);
                 if !text.is_empty() {
                     if !self.text.is_empty() {
                         self.text.push(' ');
                     }
-                    self.text.push_str(text);
-                    fx.push(Effect::Commit { segment, text: text.to_owned() });
+                    self.text.push_str(&text);
+                    fx.push(Effect::Commit { segment, text });
                 }
             }
             Err(e) => {
@@ -630,6 +632,34 @@ mod tests {
         s.engine_done(d[0].0.id, Ok("uh".into()));
         let f = finals(&feed(&mut s, QUIET, 700));
         assert_eq!(s.engine_done(f[0].0.id, Ok(String::new())), vec![Effect::Interim { segment: 1, text: String::new() }]);
+    }
+
+    #[test]
+    fn a_non_speech_draft_keeps_the_previous_draft() {
+        let mut s = Session::new(cfg());
+        let d = calls(&feed(&mut s, LOUD, 1300));
+        assert_eq!(s.engine_done(d[0].0.id, Ok("hello".into())), vec![Effect::Interim { segment: 0, text: "hello".into() }]);
+        let d = calls(&feed(&mut s, LOUD, 1000));
+        assert!(s.engine_done(d[0].0.id, Ok(" [BLANK_AUDIO] ".into())).is_empty(), "no effect: the draft stays");
+        let d = calls(&feed(&mut s, LOUD, 1000));
+        assert_eq!(
+            s.engine_done(d[0].0.id, Ok("[Music] hello there".into())),
+            vec![Effect::Interim { segment: 0, text: "hello there".into() }]
+        );
+    }
+
+    #[test]
+    fn a_non_speech_final_commits_nothing() {
+        let mut s = Session::new(cfg());
+        let d = calls(&feed(&mut s, LOUD, 1300));
+        s.engine_done(d[0].0.id, Ok("hel".into()));
+        let f = finals(&feed(&mut s, QUIET, 700));
+        assert_eq!(
+            s.engine_done(f[0].0.id, Ok("Субтитры сделал DimaTorzok".into())),
+            vec![Effect::Interim { segment: 0, text: String::new() }],
+            "no commit; the draft clears"
+        );
+        assert_eq!(s.text(), "");
     }
 
     #[test]

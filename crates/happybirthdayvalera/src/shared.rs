@@ -70,6 +70,7 @@ pub(crate) struct BehaviorFile {
     pub max_segment_ms: u32,
     pub interim_every_ms: u32,
     pub hold_ms: u32,
+    pub hallucinations: Vec<String>,
     pub easter_egg_ms: u32,
     pub lang_cycle: Vec<String>,
     pub persist_lang_key: String,

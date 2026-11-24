@@ -72,6 +72,8 @@ export interface Behavior {
   interimEveryMs: number;
   holdMs: number;
   easterEggMs: number;
+  /** Whole-result phrases that Whisper invents on silence; compared after `normalizePhrase`. */
+  hallucinations: string[];
   langCycle: Lang[];
   persistLangKey: string;
   models: { default: ModelSize; web: Record<ModelSize, string> };
