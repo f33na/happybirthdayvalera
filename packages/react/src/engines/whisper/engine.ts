@@ -1,6 +1,6 @@
 import { behavior, type Lang, type ModelSize } from '../../core/data';
 import { EngineError, type SpeechEngine } from '../../core/engine';
-import { normalizeBaseUrl } from './pipeline-config';
+import { normalizeBaseUrl, type Device } from './pipeline-config';
 import { isWorkerResponse, type WorkerRequest } from './protocol';
 
 export interface WhisperEngineOptions {
@@ -23,6 +23,12 @@ export interface WhisperEngineOptions {
    * `wasmPaths` still wins for the onnxruntime files.
    */
   modelBaseUrl?: string;
+  /**
+   * `'auto'` (default): WebGPU when the browser has an adapter and `modelBaseUrl` is set, else wasm. `'webgpu'`
+   * also uses WebGPU with the Hub, which downloads about 2.3 times more (fp32 encoder and fp16 decoder instead of
+   * q8). `'wasm'`: never WebGPU. Without an adapter every choice runs on wasm.
+   */
+  device?: Device;
 }
 
 /**
@@ -121,6 +127,7 @@ export function whisperEngine(options: WhisperEngineOptions = {}): SpeechEngine 
             model: behavior.models.web[model],
             wasmPaths: options.wasmPaths,
             ...(options.modelBaseUrl ? { modelBaseUrl: normalizeBaseUrl(options.modelBaseUrl) } : {}),
+            ...(options.device ? { device: options.device } : {}),
           });
         } catch (error) {
           loadWaiter = null;

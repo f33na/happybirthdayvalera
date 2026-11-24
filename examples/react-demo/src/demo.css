@@ -90,22 +90,42 @@ body {
   line-height: 1.4;
 }
 
-.demo__result q {
-  quotes: '“' '”';
+/* A column, so the label sits above the field however wide the page is. */
+.demo__field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--demo-muted);
+}
+
+.demo__field textarea {
+  box-sizing: border-box;
+  width: 100%;
+  padding: 12px 14px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 12px;
+  background: var(--demo-surface);
+  color: var(--demo-text);
+  font: inherit;
+  font-size: 20px;
+  line-height: 1.4;
+  resize: vertical;
+}
+
+.demo__field textarea:focus-visible {
+  outline: 2px solid var(--demo-muted);
+  outline-offset: 2px;
 }
 
 .demo__lang {
-  margin-right: 10px;
+  margin-left: 10px;
   padding: 2px 7px;
   border-radius: 6px;
   background: rgba(255, 255, 255, 0.1);
   font-size: 12px;
   font-weight: 600;
   vertical-align: middle;
-}
-
-.demo__empty {
-  color: var(--demo-muted);
 }
 
 .demo__bar {

@@ -60,8 +60,11 @@ fn Toolbar() -> Element {
 - **Recognition.** Whisper (`tiny` by default) gets the language as a forced token. On the web it runs with
   transformers.js in a Web Worker. On desktop it runs with whisper.cpp through `whisper-rs`. The model
   downloads once and stays in the cache.
-- **Dictation.** The widget records while it listens and transcribes when you stop. It also stops by itself
-  after about 1.5 s of silence.
+- **Dictation.** A tap starts listening, and the microphone stays on until a second tap, `Esc`, or 8 s without
+  speech. Each pause ends a phrase, which is transcribed in the background while you go on speaking. A draft of
+  the current phrase updates about once a second. Hold the mic to talk only while you hold it.
+- **Text fields.** `useDictation(ref)` (React) and `use_dictation(id)` (Dioxus) write the drafts and the phrases
+  straight into a `<textarea>` or `<input>` at the caret. Cmd/Ctrl+Z removes the last phrase.
 - **Pluggable.** Bring your own engine through the `SpeechEngine` interface. The React package also has a light
   Web Speech API engine that needs no model download.
 
@@ -70,13 +73,17 @@ fn Toolbar() -> Element {
 The first run downloads the Whisper model from Hugging Face, which can be slow. For local work, host the files yourself:
 
 ```sh
-just fetch-models        # tiny by default: just fetch-models base
+just fetch-models        # base by default: just fetch-models tiny
 just serve-models        # http://localhost:5299/, with CORS
 HBV_MODEL_BASE_URL=http://localhost:5299/ just stand-react-shadcn
+HBV_MODEL=small HBV_MODEL_BASE_URL=http://localhost:5299/ just stand-react-shadcn
 ```
 
-The React recipes pass `HBV_MODEL_BASE_URL` to Vite. The Dioxus stands and demos read it at compile time.
-Unset, they use the Hugging Face Hub. In production, set `modelBaseUrl` to your own CDN: see the
+With `HBV_MODEL_BASE_URL` set, the stands and demos use `base`, unless `HBV_MODEL` (`tiny`, `base` or `small`)
+says otherwise. They are cross-origin isolated, so Whisper runs on 4 wasm threads, and self-hosted `base` runs on
+WebGPU when the browser has it: about 0.4 s per phrase instead of 3 s. See
+[Speed](packages/react/README.md#speed). The React recipes pass both variables to Vite. The Dioxus stands and demos read them at compile
+time. Unset, they use the Hugging Face Hub and the library default, `tiny`. In production, set `modelBaseUrl` to your own CDN: see the
 [React package README](packages/react/README.md#self-hosted-models).
 
 The shared contract for both libraries is in [`shared/CONTRACT.md`](shared/CONTRACT.md).

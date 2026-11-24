@@ -1,13 +1,13 @@
-import { ListenerPill, MicButton, useListener, type ModelSize, type Theme } from 'happybirthdayvalera';
+import { ListenerPill, MicButton, useDictation, type ModelSize, type Theme } from 'happybirthdayvalera';
 import 'happybirthdayvalera/style.css';
 import { EvListenerPill, EvMicButton } from 'happybirthdayvalera/evinvest';
-import { useLayoutEffect, useState } from 'react';
+import { useLayoutEffect, useRef, useState, type RefObject } from 'react';
 import { VoiceListener } from '../../../registry/voice-listener/voice-listener';
 import { Button } from '@/components/ui/button';
-import { modelBaseUrl } from './model-base-url';
+import { model as envModel, modelBaseUrl } from './model-base-url';
 
 const MODELS: { value: ModelSize; label: string }[] = [
-  { value: 'tiny', label: 'tiny (~40 MB, default)' },
+  { value: 'tiny', label: 'tiny (~40 MB, library default)' },
   { value: 'base', label: 'base (~80 MB)' },
   { value: 'small', label: 'small (~250 MB)' },
 ];
@@ -21,12 +21,21 @@ const THEMES: { value: Theme; label: string }[] = [
 interface BarProps {
   model: ModelSize;
   engine: 'whisper' | 'webspeech';
-  onHeard: (text: string, lang: string) => void;
+  target: RefObject<HTMLTextAreaElement | null>;
+  onLang: (lang: string) => void;
 }
 
 /** One toolbar per theme. Each owns its listener, so switching themes releases the microphone. */
-function Bar({ theme, model, engine, onHeard }: BarProps & { theme: Theme }) {
-  const listener = useListener({ model, engine, theme, modelBaseUrl, easterEgg: true, persistLang: true, onResult: onHeard });
+function Bar({ theme, model, engine, target, onLang }: BarProps & { theme: Theme }) {
+  const listener = useDictation(target, {
+    model,
+    engine,
+    theme,
+    modelBaseUrl,
+    easterEgg: true,
+    persistLang: true,
+    onResult: (_text, lang) => onLang(lang),
+  });
   const showPill = listener.pillVisible;
 
   if (theme === 'evinvest') {
@@ -58,10 +67,11 @@ export function App() {
   useLayoutEffect(() => {
     document.documentElement.dataset.demoTheme = theme;
   }, [theme]);
-  const [model, setModel] = useState<ModelSize>('tiny');
+  const [model, setModel] = useState<ModelSize>(envModel ?? 'tiny');
   const [engine, setEngine] = useState<'whisper' | 'webspeech'>('whisper');
-  const [heard, setHeard] = useState<{ text: string; lang: string } | null>(null);
-  const onHeard = (text: string, lang: string) => setHeard({ text, lang });
+  const [lang, setLang] = useState<string | null>(null);
+  const [text, setText] = useState('');
+  const field = useRef<HTMLTextAreaElement>(null);
 
   return (
     <main className="demo">
@@ -78,19 +88,30 @@ export function App() {
         ))}
       </div>
 
-      <section className="demo__result" aria-live="polite">
-        {heard ? (
-          <>
-            <span className="demo__lang">{heard.lang.toUpperCase()}</span>
-            <q>{heard.text}</q>
-          </>
-        ) : (
-          <span className="demo__empty">Your words appear here.</span>
-        )}
+      <section className="demo__result">
+        <label className="demo__field">
+          <span>
+            Dictation{lang ? <span className="demo__lang">{lang.toUpperCase()}</span> : null}
+          </span>
+          <textarea
+            ref={field}
+            rows={5}
+            placeholder="Your words appear here, at the caret."
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+          />
+        </label>
         {theme === 'shadcn' ? (
           <div className="demo__registry">
             The shadcn registry item, built from your own Button and the shadcn tokens:
-            <VoiceListener model={model} modelBaseUrl={modelBaseUrl} engine={engine} easterEgg onResult={onHeard} />
+            <VoiceListener
+              target={field}
+              model={model}
+              modelBaseUrl={modelBaseUrl}
+              engine={engine}
+              easterEgg
+              onResult={(_t, l) => setLang(l)}
+            />
           </div>
         ) : null}
       </section>
@@ -118,7 +139,7 @@ export function App() {
           </select>
         </label>
         <span className="demo__spacer" />
-        <Bar key={theme} theme={theme} model={model} engine={engine} onHeard={onHeard} />
+        <Bar key={theme} theme={theme} model={model} engine={engine} target={field} onLang={setLang} />
       </footer>
     </main>
   );

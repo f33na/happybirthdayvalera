@@ -3,7 +3,17 @@
 // shadcn registry item: a voice-input widget built from your own Button and the shadcn tokens.
 // It uses the headless parts of `happybirthdayvalera` (the hook and the waveform) and no stylesheet of the
 // package, so edit the classes freely.
-import { Waveform, langName, langShort, micButtonProps, statusText, t, useListener, type UseListenerOptions } from 'happybirthdayvalera';
+import {
+  Waveform,
+  langName,
+  langShort,
+  micButtonProps,
+  statusText,
+  t,
+  useDictation,
+  type TextField,
+  type UseListenerOptions,
+} from 'happybirthdayvalera';
 import * as React from 'react';
 
 import { Button } from '@/components/ui/button';
@@ -13,10 +23,14 @@ import { cn } from '@/lib/utils';
 const STRANDS =
   "[&>path]:fill-none [&>path]:[stroke-linecap:round] [&>path]:[stroke-linejoin:round] [&>path[data-i='0']]:stroke-chart-1 [&>path[data-i='1']]:stroke-chart-2 [&>path[data-i='2']]:stroke-chart-3";
 
-export type VoiceListenerProps = UseListenerOptions & { className?: string };
+export type VoiceListenerProps = UseListenerOptions & {
+  className?: string;
+  /** A `<textarea>` or `<input>` to dictate into: drafts appear at the caret while the user speaks. */
+  target?: React.RefObject<TextField | null>;
+};
 
-export function VoiceListener({ className, ...options }: VoiceListenerProps) {
-  const listener = useListener(options);
+export function VoiceListener({ className, target, ...options }: VoiceListenerProps) {
+  const listener = useDictation(target ?? null, options);
   const { state, lang, levelRef, celebrating } = listener;
   const working = state === 'listening' || state === 'transcribing';
   const ring = React.useRef<HTMLSpanElement>(null);
@@ -36,6 +50,7 @@ export function VoiceListener({ className, ...options }: VoiceListenerProps) {
   }, [state, levelRef]);
 
   const { 'data-hbv-theme': _theme, ...mic } = micButtonProps(listener, 'shadcn');
+  const shown = working ? (listener.bound ? '' : listener.interim) : listener.text;
 
   return (
     <div className={cn('inline-flex items-center gap-2', className)}>
@@ -55,11 +70,8 @@ export function VoiceListener({ className, ...options }: VoiceListenerProps) {
           <span aria-live="polite" className="truncate">
             {statusText(listener)}
           </span>
-          {(state === 'listening' || state === 'transcribing' ? listener.interim : listener.text) ? (
-            <span className="text-muted-foreground max-w-64 truncate">
-              {state === 'listening' || state === 'transcribing' ? listener.interim : listener.text}
-            </span>
-          ) : null}
+          {/* A bound field shows the draft itself, so the pill does not repeat it. */}
+          {shown ? <span className="text-muted-foreground max-w-64 truncate">{shown}</span> : null}
           <span aria-hidden="true" className="flex shrink-0 items-center gap-1">
             {[0, 1, 2].map((i) => (
               <i

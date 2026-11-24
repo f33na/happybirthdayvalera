@@ -40,8 +40,10 @@ export function statusText(listener: Listener): string {
 }
 
 export function ListenerPill({ listener, theme, className, classNames, components }: ListenerPillProps) {
-  const { state, lang, levelRef, celebrating, langLocked, interim, text } = listener;
-  const shown = state === 'listening' || state === 'transcribing' ? interim : text;
+  const { state, lang, levelRef, celebrating, langLocked, interim, text, bound } = listener;
+  // A bound field shows the draft itself; the pill would only repeat it.
+  const live = state === 'listening' || state === 'transcribing';
+  const shown = live ? (bound ? '' : interim) : text;
   const LangButton = components?.LangButton ?? 'button';
   return (
     <div

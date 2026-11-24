@@ -6,6 +6,8 @@ import tokensJson from '../../../../shared/design-tokens.json';
 
 export type Lang = 'en' | 'ru' | 'de' | 'fr';
 export type ModelSize = 'tiny' | 'base' | 'small';
+/** `continuous`: listen until STOP and split the speech into segments at pauses. `utterance`: one phrase, then stop. */
+export type Mode = 'continuous' | 'utterance';
 
 export type StringKey =
   | 'status.idle'
@@ -59,9 +61,16 @@ export interface Behavior {
   sampleRate: number;
   vadThresholdRms: number;
   minSpeechMs: number;
+  mode: Mode;
   silenceMs: number;
+  segmentSilenceMs: number;
+  autoStopMs: number;
+  segmentPadBeforeMs: number;
+  segmentPadAfterMs: number;
   maxDurationMs: number;
+  maxSegmentMs: number;
   interimEveryMs: number;
+  holdMs: number;
   easterEggMs: number;
   langCycle: Lang[];
   persistLangKey: string;

@@ -1,7 +1,7 @@
 import { Moon, Send, Sun } from 'lucide-react';
-import { ListenerPill, MicButton, resolvePreferredLang, useListener, type Lang } from 'happybirthdayvalera';
+import { ListenerPill, MicButton, resolvePreferredLang, useDictation, type Lang } from 'happybirthdayvalera';
 import 'happybirthdayvalera/style.css';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState, type RefObject } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -9,23 +9,27 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { VoiceListener } from '@/components/voice-listener';
-import { modelBaseUrl } from './model-base-url';
+import { model, modelBaseUrl } from './model-base-url';
 
 const initialDark = (): boolean => {
   const mode = new URLSearchParams(location.search).get('mode');
   return mode ? mode === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches;
 };
 
+interface ToolbarProps {
+  target: RefObject<HTMLTextAreaElement | null>;
+  lang: Lang;
+  onLang: (l: Lang) => void;
+}
+
 /** Path B: our `MicButton asChild` over the app's own shadcn `Button`, with the `shadcn` theme preset. */
-function AsChildToolbar({ onText, lang, onLang }: { onText: (t: string) => void; lang: Lang; onLang: (l: Lang) => void }) {
-  const listener = useListener({
+function AsChildToolbar({ target, lang, onLang }: ToolbarProps) {
+  const listener = useDictation(target, {
     theme: 'shadcn',
+    model,
     modelBaseUrl,
     easterEgg: true,
-    onResult: (text, l) => {
-      onText(text);
-      onLang(l);
-    },
+    onResult: (_text, l) => onLang(l),
   });
   return (
     <div className="flex w-full items-center gap-2">
@@ -44,13 +48,13 @@ export function App() {
   const [dark, setDark] = useState(initialDark);
   const [text, setText] = useState('');
   const [lang, setLang] = useState<Lang>(() => resolvePreferredLang(navigator.languages));
+  // Both toolbars dictate straight into this field; it stays a normal controlled Textarea.
+  const field = useRef<HTMLTextAreaElement>(null);
 
   // shadcn's own mechanism: `.dark` on <html>. The widget tokens resolve on the widget element, so they follow.
   useEffect(() => {
     document.documentElement.classList.toggle('dark', dark);
   }, [dark]);
-
-  const append = (t: string) => setText((v) => (v ? `${v} ${t}` : t));
 
   return (
     <TooltipProvider>
@@ -72,6 +76,7 @@ export function App() {
           </CardHeader>
           <CardContent>
             <Textarea
+              ref={field}
               aria-label="Message"
               placeholder="Your dictation appears here…"
               rows={5}
@@ -86,16 +91,20 @@ export function App() {
                 <TabsTrigger value="aschild">MicButton asChild</TabsTrigger>
               </TabsList>
               <TabsContent value="item" className="flex items-center gap-2 pt-2">
-                <VoiceListener easterEgg persistLang modelBaseUrl={modelBaseUrl} onResult={(t, l) => {
-                    append(t);
-                    setLang(l);
-                  }} />
+                <VoiceListener
+                  target={field}
+                  easterEgg
+                  persistLang
+                  model={model}
+                  modelBaseUrl={modelBaseUrl}
+                  onResult={(_t, l) => setLang(l)}
+                />
                 <Badge variant="secondary" className="ml-auto">
                   {lang.toUpperCase()}
                 </Badge>
               </TabsContent>
               <TabsContent value="aschild" className="pt-2">
-                <AsChildToolbar onText={append} lang={lang} onLang={setLang} />
+                <AsChildToolbar target={field} lang={lang} onLang={setLang} />
               </TabsContent>
             </Tabs>
             <div className="flex justify-end">

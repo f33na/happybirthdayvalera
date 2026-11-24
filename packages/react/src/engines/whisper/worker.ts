@@ -4,10 +4,14 @@
 import { env, pipeline } from '@huggingface/transformers';
 import {
   cleanTranscript,
-  EXPECTED_MODEL_FILES,
   createProgressAggregator,
-  PIPELINE_DTYPE,
+  dtypeFor,
+  expectedModelFiles,
+  resolveBackend,
   transcribeOptions,
+  wasmThreads,
+  type Backend,
+  type Device,
 } from './pipeline-config';
 import type { Lang } from '../../core/data';
 import type { WorkerRequest, WorkerResponse } from './protocol';
@@ -23,15 +27,31 @@ env.allowLocalModels = false;
 env.useBrowserCache = true;
 const defaultLocalModelPath = env.localModelPath;
 
-let loadedModel: string | null = null;
+/** `<model id>@<backend>` of the loaded pipeline. */
+let loadedKey: string | null = null;
+let loadedBackend: Backend = 'wasm';
 let transcriber: Transcriber | null = null;
-let loading: { model: string; promise: Promise<void> } | null = null;
+let loading: { key: string; promise: Promise<Backend> } | null = null;
+
+/** True when the browser gives a WebGPU adapter. The DOM lib has no WebGPU types, so the shape is checked here. */
+async function hasWebGpu(): Promise<boolean> {
+  const gpu: unknown = Reflect.get(navigator, 'gpu');
+  if (typeof gpu !== 'object' || gpu === null || !('requestAdapter' in gpu) || typeof gpu.requestAdapter !== 'function') {
+    return false;
+  }
+  try {
+    const adapter: unknown = await gpu.requestAdapter();
+    return adapter !== null && adapter !== undefined;
+  } catch {
+    return false;
+  }
+}
 
 /** Self-hosted sizes: `content-length` of a `HEAD` request per expected file. A file that fails stays unknown. */
-async function fetchHostedSizes(model: string, baseUrl: string): Promise<Map<string, number>> {
+async function fetchHostedSizes(model: string, baseUrl: string, files: readonly string[]): Promise<Map<string, number>> {
   const sizes = new Map<string, number>();
   await Promise.all(
-    EXPECTED_MODEL_FILES.map(async (file) => {
+    files.map(async (file) => {
       try {
         const response = await fetch(`${baseUrl}${model}/${file}`, { method: 'HEAD', signal: AbortSignal.timeout(4000) });
         const length = Number(response.headers.get('content-length'));
@@ -66,39 +86,63 @@ async function fetchFileSizes(model: string): Promise<Map<string, number>> {
   return sizes;
 }
 
-async function load(model: string, wasmPaths?: string, modelBaseUrl?: string): Promise<void> {
+async function build(model: string, backend: Backend, modelBaseUrl: string | undefined): Promise<void> {
+  const files = expectedModelFiles(backend);
+  const sizes = modelBaseUrl ? await fetchHostedSizes(model, modelBaseUrl, files) : await fetchFileSizes(model);
+  const aggregate = createProgressAggregator(sizes, files);
+  const built = await pipeline('automatic-speech-recognition', model, {
+    dtype: dtypeFor(backend),
+    device: backend,
+    // onnxruntime warns on every WebGPU session that shape ops run on the CPU. That is by design, and the warning
+    // shows up as a console error in the host app; only real errors are logged.
+    session_options: { logSeverityLevel: 3 },
+    progress_callback: (event: object) => {
+      const fraction = aggregate(event);
+      post(fraction === null ? { type: 'progress' } : { type: 'progress', fraction });
+    },
+  });
+  // The pipeline type is a large union; this worker only uses the call signature declared above.
+  transcriber = built as unknown as Transcriber;
+}
+
+async function load(model: string, wasmPaths?: string, modelBaseUrl?: string, device: Device = 'auto'): Promise<Backend> {
   // Where onnxruntime-web fetches its .wasm and loader from; transformers.js defaults to jsDelivr.
   // Self-hosting puts them under `<base>ort/`, and an explicit `wasmPaths` still wins.
   const wasm = env.backends.onnx.wasm;
   const ortPaths = wasmPaths ?? (modelBaseUrl ? `${modelBaseUrl}ort/` : undefined);
-  if (ortPaths && wasm) wasm.wasmPaths = ortPaths;
+  if (wasm) {
+    if (ortPaths) wasm.wasmPaths = ortPaths;
+    // Read once, when the first session starts. Without isolation onnxruntime runs on one thread anyway.
+    wasm.numThreads = wasmThreads(self.crossOriginIsolated, navigator.hardwareConcurrency);
+  }
   // Models are read from `<base><model id>/…`, never from the Hub, when a base URL is given.
   env.allowLocalModels = modelBaseUrl !== undefined;
   env.allowRemoteModels = modelBaseUrl === undefined;
   env.localModelPath = modelBaseUrl ?? defaultLocalModelPath;
-  if (loadedModel === model && transcriber) return;
-  if (loading?.model === model) return loading.promise;
-  const sizes = modelBaseUrl ? await fetchHostedSizes(model, modelBaseUrl) : await fetchFileSizes(model);
-  const aggregate = createProgressAggregator(sizes);
-  const promise = (async () => {
+  const wanted = resolveBackend(device, device !== 'wasm' && (await hasWebGpu()), modelBaseUrl !== undefined, model);
+  const key = `${model}@${wanted}`;
+  if (loadedKey === key && transcriber) return loadedBackend;
+  if (loading?.key === key) return loading.promise;
+  const promise = (async (): Promise<Backend> => {
     transcriber = null;
-    loadedModel = null;
-    const built = await pipeline('automatic-speech-recognition', model, {
-      dtype: PIPELINE_DTYPE,
-      device: 'wasm',
-      progress_callback: (event: object) => {
-        const fraction = aggregate(event);
-        post(fraction === null ? { type: 'progress' } : { type: 'progress', fraction });
-      },
-    });
-    // The pipeline type is a large union; this worker only uses the call signature declared above.
-    transcriber = built as unknown as Transcriber;
-    loadedModel = model;
+    loadedKey = null;
+    let backend = wanted;
+    try {
+      await build(model, backend, modelBaseUrl);
+    } catch (error) {
+      // `auto` must never be worse than wasm: missing fp32/fp16 files or a GPU failure fall back to q8 on wasm.
+      if (backend !== 'webgpu' || device !== 'auto') throw error;
+      backend = 'wasm';
+      await build(model, backend, modelBaseUrl);
+    }
+    loadedKey = key;
+    loadedBackend = backend;
     post({ type: 'progress', fraction: 1 });
+    return backend;
   })();
-  loading = { model, promise };
+  loading = { key, promise };
   try {
-    await promise;
+    return await promise;
   } finally {
     loading = null;
   }
@@ -119,8 +163,8 @@ self.onmessage = (event: MessageEvent<WorkerRequest>) => {
   queue = queue.then(async () => {
     try {
       if (request.type === 'load') {
-        await load(request.model, request.wasmPaths, request.modelBaseUrl);
-        post({ type: 'ready' });
+        const device = await load(request.model, request.wasmPaths, request.modelBaseUrl, request.device);
+        post({ type: 'ready', device });
       } else {
         await transcribe(request.id, request.pcm, request.lang);
       }

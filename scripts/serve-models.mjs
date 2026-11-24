@@ -18,7 +18,12 @@ const TYPES = {
 };
 
 const server = http.createServer((req, res) => {
-  const headers = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Methods': 'GET, HEAD, OPTIONS' };
+  // CORP lets a cross-origin-isolated page (COEP `require-corp`, needed for multithreaded wasm) load these files.
+  const headers = {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Methods': 'GET, HEAD, OPTIONS',
+    'Cross-Origin-Resource-Policy': 'cross-origin',
+  };
   if (req.method === 'OPTIONS') {
     res.writeHead(204, headers).end();
     return;

@@ -1,4 +1,4 @@
-import type { Lang } from '../../core/data';
+import { behavior, type Lang } from '../../core/data';
 
 // Whisper takes the language as a forced decoder token. Full names are what transformers.js documents.
 export const WHISPER_LANGUAGE: Record<Lang, string> = {
@@ -8,8 +8,47 @@ export const WHISPER_LANGUAGE: Record<Lang, string> = {
   fr: 'french',
 };
 
-/** Options for `pipeline('automatic-speech-recognition', model, …)`. Shared by the worker and the Node accuracy test. */
+/** What the host asks for. `auto`: WebGPU when it is available and the models are self-hosted, else wasm. */
+export type Device = 'auto' | 'webgpu' | 'wasm';
+/** What actually runs. */
+export type Backend = 'webgpu' | 'wasm';
+
+/** Options for `pipeline('automatic-speech-recognition', model, …)` on wasm. Shared by the worker and the Node accuracy test. */
 export const PIPELINE_DTYPE = { encoder_model: 'q8', decoder_model_merged: 'q8' } as const;
+
+/**
+ * WebGPU dtypes. The q8 files give garbage text on WebGPU and run slower than on wasm, and an fp16 encoder breaks
+ * `base`. An fp32 encoder with an fp16 decoder is the fast and correct pair, but it is about 2.3 times the q8
+ * download (tiny 92.5 MB instead of 41 MB), so `auto` uses it only with self-hosted models.
+ */
+export const WEBGPU_DTYPE = { encoder_model: 'fp32', decoder_model_merged: 'fp16' } as const;
+
+export function dtypeFor(backend: Backend): typeof PIPELINE_DTYPE | typeof WEBGPU_DTYPE {
+  return backend === 'webgpu' ? WEBGPU_DTYPE : PIPELINE_DTYPE;
+}
+
+/**
+ * Models that `auto` runs on WebGPU. `base` passes the fixture keywords in all four languages there and is about
+ * 7 times faster than on one wasm thread. `tiny` on WebGPU misses a French keyword that the q8 model finds (its
+ * full-precision output splits "anniversaire"), and it is already fast on wasm threads. `small` is not measured.
+ */
+export const AUTO_WEBGPU_MODELS: ReadonlySet<string> = new Set([behavior.models.web.base]);
+
+/** `webgpu` without an adapter falls back to wasm instead of failing. */
+export function resolveBackend(requested: Device, hasAdapter: boolean, selfHosted: boolean, model: string): Backend {
+  if (requested === 'wasm' || !hasAdapter) return 'wasm';
+  if (requested === 'webgpu') return 'webgpu';
+  return selfHosted && AUTO_WEBGPU_MODELS.has(model) ? 'webgpu' : 'wasm';
+}
+
+/**
+ * onnxruntime-web threads. Threads need SharedArrayBuffer, which exists only on a cross-origin-isolated page
+ * (COOP `same-origin` + COEP `require-corp` or `credentialless`). More than 4 was slower on an 8-core M2:
+ * the extra threads land on the efficiency cores.
+ */
+export function wasmThreads(isolated: boolean, cores: number | undefined): number {
+  return isolated ? Math.max(1, Math.min(4, cores ?? 1)) : 1;
+}
 
 export function transcribeOptions(lang: Lang) {
   return {
@@ -28,6 +67,12 @@ export interface FileProgress {
 
 /** The two large files that transformers.js downloads for `PIPELINE_DTYPE` (`q8` is the `_quantized` suffix). */
 export const EXPECTED_MODEL_FILES = ['onnx/encoder_model_quantized.onnx', 'onnx/decoder_model_merged_quantized.onnx'];
+/** The same for `WEBGPU_DTYPE` (fp32 has no suffix). */
+export const WEBGPU_MODEL_FILES = ['onnx/encoder_model.onnx', 'onnx/decoder_model_merged_fp16.onnx'];
+
+export function expectedModelFiles(backend: Backend): readonly string[] {
+  return backend === 'webgpu' ? WEBGPU_MODEL_FILES : EXPECTED_MODEL_FILES;
+}
 
 /**
  * Turns the per-file events of `progress_callback` into one fraction over all model files, or `null` while

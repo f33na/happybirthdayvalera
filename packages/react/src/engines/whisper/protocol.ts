@@ -1,14 +1,15 @@
 import type { Lang } from '../../core/data';
+import type { Backend, Device } from './pipeline-config';
 
 /** Main → worker. The `pcm` buffer of `transcribe` is transferred. */
 export type WorkerRequest =
-  | { type: 'load'; model: string; wasmPaths?: string; modelBaseUrl?: string }
+  | { type: 'load'; model: string; wasmPaths?: string; modelBaseUrl?: string; device?: Device }
   | { type: 'transcribe'; id: number; pcm: Float32Array; lang: Lang };
 
 /** Worker → main. `error.id` is absent for a load error. */
 export type WorkerResponse =
   | { type: 'progress'; fraction?: number }
-  | { type: 'ready' }
+  | { type: 'ready'; device?: Backend }
   | { type: 'result'; id: number; text: string }
   | { type: 'error'; id?: number; message: string };
 

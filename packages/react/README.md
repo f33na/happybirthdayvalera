@@ -34,6 +34,45 @@ export function Toolbar() {
 
 The first tap asks for the microphone and downloads the model. Later taps start at once.
 
+## Dictation into a text field
+
+`useDictation(ref, options)` takes the same options as `useListener` and returns the same listener, bound to a
+`<textarea>` or `<input>`. You write no glue code:
+
+```tsx
+import { ListenerPill, MicButton, useDictation } from 'happybirthdayvalera';
+
+export function Composer() {
+  const field = useRef<HTMLTextAreaElement>(null);
+  const [text, setText] = useState('');
+  const listener = useDictation(field);
+  return (
+    <>
+      <textarea ref={field} value={text} onChange={(e) => setText(e.target.value)} />
+      <MicButton listener={listener} />
+      {listener.pillVisible && <ListenerPill listener={listener} />}
+    </>
+  );
+}
+```
+
+- The text goes to the caret, or replaces the selection, at the moment you tap the mic. If the field does not
+  have the focus, the text goes to the end. The mic does not take the focus from a bound field.
+- While you speak, a draft of the current phrase appears in the field and is replaced in place. After a pause the
+  final text of the phrase replaces the draft, and the next phrase continues after it.
+- One space goes before the inserted text when it is needed. The first letter becomes a capital at the start of the
+  field and after `.`, `!` or `?`. Whisper's punctuation stays as it is.
+- One space goes after the inserted text when the next character is not whitespace and not punctuation that
+  attaches to the left (`. , ! ? ; : ) ] » ”`).
+- If you type outside the draft, the draft is removed and the final text of that phrase goes to your caret. If you
+  type inside the draft, the text is yours: the final of that phrase is not inserted, so nothing is repeated.
+- Every change fires a native `input` event, so a controlled field (`value` + `onChange`) sees it.
+- Cmd/Ctrl+Z removes the last phrase in one step: it is inserted with `document.execCommand('insertText')`, and
+  drafts never enter the undo stack. Gap: when the field does not have the focus (for example, a keyboard user
+  pressed the mic), the text is set through the value setter, and the browser cannot undo it.
+- `Esc` in the field stops listening. The pill does not repeat the draft, because the field shows it.
+- `useDictation(null, options)` binds nothing and works like `useListener`.
+
 ## Options of `useListener`
 
 | Option | Default | Meaning |
@@ -42,22 +81,32 @@ The first tap asks for the microphone and downloads the model. Later taps start 
 | `persistLang` | `false` | Remember the language picked with the chip in `localStorage`. |
 | `engine` | `'whisper'` | `'whisper'`, `'webspeech'` or your own `SpeechEngine`. |
 | `model` | `'tiny'` | Whisper size: `'tiny'`, `'base'` or `'small'`. |
-| `onResult(text, lang)` | none | Called once per utterance with the final text. |
-| `onInterim(text, lang)` | none | Called with partial text while listening. |
-| `interimEveryMs` | `0` | Transcribe the audio so far at this interval. `0` turns it off. |
-| `silenceMs` | `1500` | Silence after speech that ends the recording. |
+| `mode` | `'continuous'` | `'continuous'`: listen until stopped and split the speech at pauses. `'utterance'`: one phrase, then stop. |
+| `onResult(text, lang)` | none | Called with the final text of every phrase (segment). In `utterance` mode, once. |
+| `onInterim(text, lang)` | none | Called with every draft of the current phrase. |
+| `interimEveryMs` | `1000` | Make a draft of the current phrase at this interval. `0` turns drafts off. |
+| `segmentSilenceMs` | `700` | `continuous`: a pause this long after speech ends a phrase. |
+| `autoStopMs` | `8000` | `continuous`: no speech for this long stops listening. |
+| `segmentPadBeforeMs` / `segmentPadAfterMs` | `200` / `300` | Audio kept before and after the speech of a phrase. |
+| `maxSegmentMs` | `28000` | A longer phrase is cut here; Whisper sees at most 30 s. |
+| `silenceMs` | `1500` | `utterance`: silence after speech that ends the recording. |
+| `holdMs` | `300` | A press on the mic longer than this is hold-to-talk. |
 | `easterEgg` | `false` | Celebrate when the text contains a birthday phrase, in any of the four languages. |
 | `preload` | `false` | Load the model on mount, not on the first tap. |
 | `theme` | `'default'` | `'default'`, `'shadcn'` or `'evinvest'`. See [Theming](#theming). |
 | `modelBaseUrl` | Hub | Base URL of your own copy of the model files and the onnxruntime files. See [Self-hosted models](#self-hosted-models). |
 | `wasmPaths` | CDN | Base URL of the onnxruntime `.wasm` files (default Whisper engine). See [Fully offline](#fully-offline). |
+| `device` | `'auto'` | `'auto'`, `'webgpu'` or `'wasm'`: where Whisper runs. See [Speed](#speed). |
 
 The language is the forced `lang`, then the stored choice (with `persistLang`), then the browser language.
 It is also the recognition language, and the language of every string in the widget.
 
-The hook returns `state`, `error`, `progress` (0 to 1), `text`, `interim`, `lang`, `setLang`, `cycleLang`,
-`start`, `stop`, `toggle`, `reset`, `celebrating`, `levelRef` and `theme`. It also returns three values that the pill
-needs: `nothingHeard` (the last recording had no speech), `langLocked` (`lang` is forced) and `pillVisible`.
+The hook returns `state`, `error`, `progress` (0 to 1), `text` (the committed text of the session, phrases
+joined with one space), `interim` (the draft of the current phrase), `lang`, `setLang`, `cycleLang`, `start`,
+`stop`, `toggle`, `reset`, `celebrating`, `levelRef` and `theme`. It also returns three values that the pill
+needs: `nothingHeard` (the last session had no speech), `langLocked` (`lang` is forced) and `pillVisible`.
+For hosts that draw their own mic there are `pressStart`, `pressEnd`, `click(fromPointer)`, `holding` and
+`bound`; `micButtonProps` wires them for you.
 
 Mount the pill on `pillVisible`, not on `state !== 'idle'`. The easter egg is shown while the state is `idle`,
 so a pill that hides in `idle` never shows it. `progress` is a fraction, or `null` while the size of a model file
@@ -67,8 +116,18 @@ is unknown; the status then reads "Loading model…" and never shows a made-up p
 `levelRef.current` is the smoothed input level from 0 to 1. It changes every frame and never causes a
 re-render. Read it in your own `requestAnimationFrame` loop.
 
-Recording stops by itself when you stay silent for `silenceMs` after speaking, or after 30 seconds.
-A recording with no speech is not sent to the model: Whisper makes up text from silence.
+In the default `continuous` mode a tap starts listening, and the microphone stays on until a second tap, `Esc`, or
+`autoStopMs` without speech. Each pause of `segmentSilenceMs` ends a phrase. The phrase goes to the model in the
+background, and its text is committed in order while you go on speaking. A tap that stops waits until every phrase
+is committed. In `utterance` mode, recording stops by itself after `silenceMs` of silence after speech, or after
+30 seconds.
+
+Press and hold the mic longer than `holdMs` to talk only while you hold it: release stops. A shorter press is a tap.
+While held, the mic has `data-hold="true"`. Space and Enter always toggle.
+
+Audio with no speech is not sent to the model: Whisper makes up text from silence. Only one model call runs at a
+time, and a final phrase always goes before a draft. A draft that cannot start because the model is busy is
+skipped, so a slow model makes fewer drafts instead of a queue.
 
 ## Engines
 
@@ -99,6 +158,37 @@ Whisper models from `onnx-community`, quantized to 8 bit. Sizes are approximate 
 | `small` | about 250 MB | best accuracy, slow on a phone |
 
 The language is forced, so Whisper does not guess it. The task is always `transcribe`, never `translate`.
+
+### Speed
+
+One Whisper call costs about the same for 1 s and for 6 s of audio, because Whisper pads its input to 30 s.
+Measured in Chrome on an Apple M2, per call:
+
+| Setup | `tiny` | `base` |
+| --- | --- | --- |
+| wasm, one thread (no headers) | 1.2–1.4 s | 2.8–3.0 s |
+| wasm, 4 threads (cross-origin isolated) | 0.45–0.75 s | 0.8–1.25 s |
+| WebGPU (`base` with `modelBaseUrl`) | — | 0.3–0.4 s |
+
+**Send two headers on your page** to get the threads:
+
+```text
+Cross-Origin-Opener-Policy: same-origin
+Cross-Origin-Embedder-Policy: require-corp
+```
+
+The worker then runs onnxruntime on `min(4, cores)` threads. Without the headers it runs on one thread: it still
+works, only slower. With `require-corp`, every cross-origin file of your page needs CORS or a
+`Cross-Origin-Resource-Policy` header. The Hugging Face Hub and jsDelivr send CORS. If an embed of yours cannot,
+use `Cross-Origin-Embedder-Policy: credentialless` (Chrome and Firefox). In Vite set `server.headers` and
+`preview.headers`; in Next.js use `headers()` in `next.config`.
+
+**WebGPU.** With `device: 'auto'` (the default), `base` runs on WebGPU when the browser has an adapter and you set
+`modelBaseUrl`. WebGPU needs other files than wasm: `onnx/encoder_model.onnx` (fp32) and
+`onnx/decoder_model_merged_fp16.onnx`, 187 MB for `base` instead of 77 MB, so `auto` never pulls them from the Hub.
+`tiny` stays on wasm threads: it is fast there, and on WebGPU it got a French test phrase wrong. If WebGPU fails to
+load, `auto` falls back to wasm. `device: 'webgpu'` forces WebGPU for any model, from the Hub too; `'wasm'` never
+uses it.
 
 ### The worker
 
@@ -156,7 +246,9 @@ or `whisperEngine({ modelBaseUrl })`. A missing trailing `/` is added. The host 
 <base>ort/ort-wasm-simd-threaded.jsep.mjs     (the onnxruntime files; `wasmPaths` wins if you set it)
 ```
 
-In the repository, `just fetch-models` and `just serve-models` build and serve this layout for local work.
+In the repository, `just fetch-models` (`base` by default, with its WebGPU files) and `just serve-models` build and
+serve this layout for local work. The server sends `Cross-Origin-Resource-Policy: cross-origin`, so cross-origin-isolated
+pages can load from it.
 
 `import 'happybirthdayvalera/style.css'` adds one small stylesheet. Every colour, size, radius, font and
 duration is a CSS custom property named `--hbv-<group>-<key>`, for example `--hbv-color-pill-bg`. The
@@ -215,7 +307,8 @@ composes `onClick`, forwards `ref` and adds all the aria and data attributes:
 
 For a fully custom UI, use the headless parts: `useListener`, `Waveform`, `wavePath(i, t, A)`,
 `t(lang, key, vars)`, `statusText(listener)`, `langName`, `langShort` and `micButtonProps(listener)`. The last one
-returns the `aria-*`, `data-*`, `type` and `onClick` props for any element.
+returns the `aria-*`, `data-*` and `type` props and the click, pointer, mouse and key handlers (tap, hold to talk, `Esc`)
+for any element.
 
 ### 3. Native adapters
 
@@ -244,7 +337,8 @@ npx shadcn add <url of registry/public/r/voice-listener.json>
 ```
 
 The URL works once the repository is public. The item imports `@/components/ui/button` and `@/lib/utils`, and
-adds the `happybirthdayvalera` dependency.
+adds the `happybirthdayvalera` dependency. Pass `target={ref}` to dictate into a `<textarea>` or `<input>`
+(see [Dictation into a text field](#dictation-into-a-text-field)).
 
 Known limit: the base stylesheet is not in a cascade layer, so for the properties that it sets (background,
 size, radius of the mic) it wins over Tailwind utilities, which live in `@layer utilities`. The presets map the

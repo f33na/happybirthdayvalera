@@ -11,7 +11,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 function fakeListener(patch: Partial<Listener> = {}): Listener {
-  return {
+  const listener: Listener = {
     state: 'idle',
     error: null,
     progress: 0,
@@ -30,8 +30,16 @@ function fakeListener(patch: Partial<Listener> = {}): Listener {
     langLocked: false,
     theme: 'default',
     pillVisible: false,
+    pressStart: vi.fn(),
+    pressEnd: vi.fn(),
+    click: vi.fn(),
+    holding: false,
+    bound: false,
     ...patch,
   };
+  // As in the controller: a click that did not start the session with its own press toggles.
+  if (!patch.click) listener.click = vi.fn((fromPointer: boolean) => (fromPointer ? undefined : listener.toggle()));
+  return listener;
 }
 
 afterEach(cleanup);

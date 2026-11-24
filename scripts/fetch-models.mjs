@@ -1,4 +1,5 @@
 // Downloads the files for self-hosted models into models/hosted/. Run: just fetch-models [tiny|base|small]
+// The default is base: the stands and demos use it whenever HBV_MODEL_BASE_URL is set (see shared/CONTRACT.md).
 // Layout (see shared/CONTRACT.md, "Self-hosted models"): <model id>/…, ort/…, ggml-<size>.bin.
 import fs from 'node:fs';
 import path from 'node:path';
@@ -8,7 +9,7 @@ const root = new URL('..', import.meta.url);
 const at = (p) => fileURLToPath(new URL(p, root));
 const behavior = JSON.parse(fs.readFileSync(at('shared/behavior.json'), 'utf8'));
 
-const size = process.argv[2] ?? 'tiny';
+const size = process.argv[2] ?? 'base';
 const modelId = behavior.models.web[size];
 if (!modelId) {
   console.error(`Unknown size "${size}". Use one of: ${Object.keys(behavior.models.web).join(', ')}`);
@@ -16,7 +17,11 @@ if (!modelId) {
 }
 const outDir = at('models/hosted');
 
-// What the q8 pipeline reads: PIPELINE_DTYPE and EXPECTED_MODEL_FILES in packages/react/src/engines/whisper/pipeline-config.ts.
+// What the pipeline reads, from packages/react/src/engines/whisper/pipeline-config.ts: the q8 pair for wasm
+// (PIPELINE_DTYPE, EXPECTED_MODEL_FILES) and the fp32/fp16 pair for WebGPU (WEBGPU_DTYPE, WEBGPU_MODEL_FILES).
+// `device: 'auto'` uses WebGPU only with self-hosted models, and only for the sizes in AUTO_WEBGPU_MODELS, so only
+// those sizes get the WebGPU pair too.
+const AUTO_WEBGPU_SIZES = new Set(['base']);
 const MODEL_FILES = [
   'config.json',
   'generation_config.json',
@@ -25,6 +30,7 @@ const MODEL_FILES = [
   'tokenizer_config.json',
   'onnx/encoder_model_quantized.onnx',
   'onnx/decoder_model_merged_quantized.onnx',
+  ...(AUTO_WEBGPU_SIZES.has(size) ? ['onnx/encoder_model.onnx', 'onnx/decoder_model_merged_fp16.onnx'] : []),
 ];
 
 /** Size on the server, or null when it is not reported. */

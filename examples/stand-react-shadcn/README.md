@@ -12,7 +12,10 @@ just stand-react-shadcn        # builds the package, then starts the stand on ht
 ```
 
 Open `http://localhost:5201/?mode=dark` to start in dark mode. The sun and moon button toggles `.dark` on `<html>`.
-Use Chrome or Edge for the microphone. The first dictation downloads the Whisper `base` model (about 80 MB).
+Use Chrome or Edge for the microphone.
+The first dictation downloads the Whisper model: `tiny` (about 40 MB) from the Hub by default. With
+`HBV_MODEL_BASE_URL` set, the stand uses `base` (about 80 MB) from your server; `HBV_MODEL=tiny|base|small` picks
+another size.
 
 ## What it proves
 
@@ -26,7 +29,9 @@ Use Chrome or Edge for the microphone. The first dictation downloads the Whisper
   `<Button variant="outline" size="icon">`, with `theme: 'shadcn'` and `ListenerPill` mounted on `pillVisible`.
 - **Live dark mode.** The widget tokens resolve on the widget element, so toggling `.dark` recolours both paths
   with no re-render of the widget.
-- **Dictation.** The final text of each utterance is appended to the `Textarea`. The badge shows the language.
+- **Dictation.** Both tabs bind the `Textarea` with `useDictation` (the registry item through its `target` prop):
+  drafts appear at the caret while you speak, each pause commits a segment, and Cmd/Ctrl+Z removes the last one.
+  The microphone stays on until a second tap, Esc or 8 s without speech. The badge shows the language.
 
 The Vite production build also proves that the Whisper worker shipped in the package is picked up by Vite:
 `vite build` emits it as `assets/whisper-worker-*.js`.

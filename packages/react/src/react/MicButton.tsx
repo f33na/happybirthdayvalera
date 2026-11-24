@@ -1,4 +1,13 @@
-import { forwardRef, useEffect, useImperativeHandle, useRef, type MouseEventHandler, type ReactNode } from 'react';
+import {
+  forwardRef,
+  useEffect,
+  useImperativeHandle,
+  useRef,
+  type KeyboardEventHandler,
+  type MouseEventHandler,
+  type PointerEventHandler,
+  type ReactNode,
+} from 'react';
 import { t } from '../core/i18n';
 import { isActive } from '../core/machine';
 import { Slot } from './Slot';
@@ -24,10 +33,20 @@ export interface MicButtonDomProps {
   'data-state': Listener['state'];
   'data-hbv-theme': Theme;
   'data-celebrate': 'true' | 'false';
+  /** `true` while the pointer holds the mic longer than `holdMs` (hold to talk). */
+  'data-hold': 'true' | 'false';
   onClick: MouseEventHandler;
+  onPointerDown: PointerEventHandler;
+  onPointerUp: PointerEventHandler;
+  onPointerCancel: PointerEventHandler;
+  onMouseDown: MouseEventHandler;
+  onKeyDown: KeyboardEventHandler;
 }
 
-/** The aria, data and click props of the mic button, for hosts that render their own element. */
+/**
+ * The aria, data and event props of the mic button, for hosts that render their own element: tap to toggle,
+ * hold to talk, Esc to stop.
+ */
 export function micButtonProps(listener: Listener, theme: Theme = listener.theme): MicButtonDomProps {
   const pressed = isActive(listener.state);
   return {
@@ -37,7 +56,28 @@ export function micButtonProps(listener: Listener, theme: Theme = listener.theme
     'data-state': listener.state,
     'data-hbv-theme': theme,
     'data-celebrate': listener.celebrating ? 'true' : 'false',
-    onClick: listener.toggle,
+    'data-hold': listener.holding ? 'true' : 'false',
+    // Space and Enter give a click with `detail === 0`; they toggle and never hold.
+    onClick: (event) => listener.click(event.detail > 0),
+    onPointerDown: (event) => {
+      if (event.button !== 0) return;
+      // Capture, so the release reaches the mic even when the pointer has left it.
+      if (typeof event.currentTarget.setPointerCapture === 'function') event.currentTarget.setPointerCapture(event.pointerId);
+      listener.pressStart();
+    },
+    onPointerUp: () => listener.pressEnd(),
+    onPointerCancel: () => listener.pressEnd(),
+    // With a bound field, the press must not take the focus: the caret stays where the text goes, and the
+    // browser can undo each inserted segment.
+    onMouseDown: (event) => {
+      if (listener.bound) event.preventDefault();
+    },
+    onKeyDown: (event) => {
+      if (event.key === 'Escape' && pressed) {
+        event.preventDefault();
+        listener.stop();
+      }
+    },
   };
 }
 

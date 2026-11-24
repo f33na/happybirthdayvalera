@@ -56,7 +56,7 @@ describe('useListener', () => {
   it('runs the happy path and reports the final text once', async () => {
     const engine = fakeEngine();
     const onResult = vi.fn();
-    const { result } = setup({ engine, onResult, easterEgg: true });
+    const { result } = setup({ engine, onResult, easterEgg: true, mode: 'utterance' });
 
     expect(result.current.state).toBe('idle');
     act(() => result.current.start());

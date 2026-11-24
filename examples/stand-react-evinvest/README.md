@@ -12,8 +12,10 @@ just stand-react-evinvest      # builds the package, then starts the stand on ht
 ```
 
 Open `http://localhost:5202/?mode=light` to start in light mode. The sun button toggles the kit's own `.light`
-class on a wrapper. Dark is the kit default. Use Chrome or Edge for the microphone. The first dictation
-downloads the Whisper `base` model (about 80 MB).
+class on a wrapper. Dark is the kit default. Use Chrome or Edge for the microphone.
+The first dictation downloads the Whisper model: `tiny` (about 40 MB) from the Hub by default. With
+`HBV_MODEL_BASE_URL` set, the stand uses `base` (about 80 MB) from your server; `HBV_MODEL=tiny|base|small` picks
+another size.
 
 ## What it proves
 
@@ -27,5 +29,6 @@ downloads the Whisper `base` model (about 80 MB).
   chip. The adapter adds no Tailwind classes of its own.
 - **Consumer imports.** Only the public `exports` of the package are used: `happybirthdayvalera`,
   `happybirthdayvalera/evinvest` and `happybirthdayvalera/style.css`.
-- **Composer.** Card, Textarea, Button, Badge and Tooltip come from the kit. The final text of each utterance is
-  appended to the Textarea, and the pill is mounted on `pillVisible`.
+- **Composer.** Card, Textarea, Button, Badge and Tooltip come from the kit. The Textarea is bound with
+  `useDictation`: drafts appear at the caret while you speak, each pause commits a segment, and Cmd/Ctrl+Z removes
+  the last one. The pill is mounted on `pillVisible` and does not repeat the draft.

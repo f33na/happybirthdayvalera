@@ -13,11 +13,11 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@evinvest/uikit';
-import { useListener } from 'happybirthdayvalera';
+import { useDictation } from 'happybirthdayvalera';
 import 'happybirthdayvalera/style.css';
 import { EvListenerPill, EvMicButton } from 'happybirthdayvalera/evinvest';
-import { useState } from 'react';
-import { modelBaseUrl } from './model-base-url';
+import { useRef, useState } from 'react';
+import { model, modelBaseUrl } from './model-base-url';
 
 const initialLight = (): boolean => new URLSearchParams(location.search).get('mode') === 'light';
 
@@ -25,13 +25,9 @@ export function App() {
   // The kit's own mechanism: dark is the default on :root, and `.light` on a wrapper switches the polarity.
   const [light, setLight] = useState(initialLight);
   const [text, setText] = useState('');
-  const listener = useListener({
-    theme: 'evinvest',
-    modelBaseUrl,
-    easterEgg: true,
-    persistLang: true,
-    onResult: (result) => setText((v) => (v ? `${v} ${result}` : result)),
-  });
+  const field = useRef<HTMLTextAreaElement>(null);
+  // Dictation goes straight into the field, at the caret; the field stays a normal controlled Textarea.
+  const listener = useDictation(field, { theme: 'evinvest', model, modelBaseUrl, easterEgg: true, persistLang: true });
 
   return (
     <TooltipProvider>
@@ -66,6 +62,7 @@ export function App() {
             </CardHeader>
             <CardContent>
               <Textarea
+                ref={field}
                 aria-label="Message"
                 placeholder="Your dictation appears here…"
                 rows={5}
