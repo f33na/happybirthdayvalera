@@ -1,0 +1,18 @@
+{
+  "name": "happybirthdayvalera-workspace",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "packages/react",
+    "examples/react-demo",
+    "examples/stand-react-shadcn",
+    "examples/stand-react-evinvest"
+  ],
+  "scripts": {
+    "registry:check": "tsc -p registry/tsconfig.json",
+    "registry:build": "shadcn build registry/registry.json --output registry/public/r"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

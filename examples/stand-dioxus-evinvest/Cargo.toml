@@ -1,0 +1,15 @@
+[package]
+name = "stand-dioxus-evinvest"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+publish = false
+description = "A voice dictation composer on the evinvest Dioxus kit, consuming happybirthdayvalera."
+
+[dependencies]
+dioxus = { version = "0.7.9", features = ["web"] }
+ev_lib = { version = "0.34", default-features = false, features = ["uikit_dioxus"] }
+happybirthdayvalera = { path = "../../crates/happybirthdayvalera", features = ["web", "ev_uikit"] }
+
+[build-dependencies]
+ev_lib_classes = "0.20"

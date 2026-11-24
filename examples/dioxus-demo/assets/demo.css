@@ -1,0 +1,86 @@
+/* Page layout of the demo only. The widget's look comes from the crate's stylesheet. */
+:root {
+  color-scheme: dark;
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  background: #0e0c14;
+  color: #ece8f6;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+}
+
+.demo {
+  max-width: 40rem;
+  margin: 0 auto;
+  padding: 3rem 1.5rem 8rem;
+}
+
+.demo h1 {
+  font-size: 1.5rem;
+  margin: 0 0 0.5rem;
+}
+
+.demo__hint {
+  color: #a49cb8;
+  margin: 0 0 2rem;
+}
+
+.demo__log {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 2rem;
+  display: grid;
+  gap: 0.5rem;
+}
+
+.demo__log li {
+  display: flex;
+  gap: 0.75rem;
+  align-items: baseline;
+  padding: 0.75rem 1rem;
+  border-radius: 12px;
+  background: #1a1724;
+}
+
+.demo__lang {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #8aa4ff;
+}
+
+.demo__theme {
+  color: #a49cb8;
+  font-size: 0.875rem;
+}
+
+.demo__toolbar {
+  position: fixed;
+  inset: auto 0 0 0;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: 12px;
+  padding: 16px;
+  background: linear-gradient(to top, #0e0c14 60%, transparent);
+}
+
+/* On a narrow screen a long celebration text must shrink the pill, not push the mic off-screen. */
+.demo__toolbar > .hbv-pill {
+  min-inline-size: 0;
+}
+
+.demo__note {
+  box-sizing: border-box;
+  inline-size: 100%;
+  margin: 0 0 1.5rem;
+  padding: 0.75rem 1rem;
+  border: 1px solid #2c2838;
+  border-radius: 12px;
+  background: #1a1724;
+  color: inherit;
+  font: inherit;
+  resize: vertical;
+}

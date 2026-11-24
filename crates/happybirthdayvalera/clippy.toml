@@ -1,0 +1,7 @@
+# web-sys gives some media types an inherent `clone()` that calls the JS method and shadows `Clone`.
+# `MediaStream.clone()` creates new tracks, so a capture that kept one never released the microphone.
+# Use `Clone::clone(&x)` for a handle copy.
+disallowed-methods = [
+    { path = "web_sys::MediaStream::clone", reason = "creates new tracks; use Clone::clone(&stream) for a handle" },
+    { path = "web_sys::MediaStreamTrack::clone", reason = "creates a new track; use Clone::clone(&track) for a handle" },
+]

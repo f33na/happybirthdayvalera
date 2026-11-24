@@ -1,0 +1,5 @@
+[application]
+name = "stand-dioxus-evinvest"
+
+[web.app]
+title = "Voice dictation — Dioxus + evinvest kit stand"

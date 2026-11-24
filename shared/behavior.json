@@ -1,0 +1,49 @@
+{
+  "$comment": "Runtime defaults for both libraries. Every value is overridable through the listener config.",
+  "sampleRate": 16000,
+  "vadThresholdRms": 0.012,
+  "minSpeechMs": 250,
+  "mode": "continuous",
+  "silenceMs": 1500,
+  "segmentSilenceMs": 700,
+  "autoStopMs": 8000,
+  "segmentPadBeforeMs": 200,
+  "segmentPadAfterMs": 300,
+  "maxDurationMs": 30000,
+  "maxSegmentMs": 28000,
+  "interimEveryMs": 1000,
+  "holdMs": 300,
+  "easterEggMs": 3000,
+  "hallucinations": [
+    "субтитры сделал dimatorzok",
+    "субтитры создавал dimatorzok",
+    "редактор субтитров а синецкая корректор а егорова",
+    "продолжение следует",
+    "спасибо за просмотр",
+    "thank you for watching",
+    "thanks for watching",
+    "thank you",
+    "untertitel der amara org community",
+    "untertitel im auftrag des zdf",
+    "vielen dank fürs zuschauen",
+    "sous titrage st 501",
+    "sous titres réalisés par la communauté d amara org",
+    "merci d avoir regardé"
+  ],
+  "langCycle": ["en", "ru", "de", "fr"],
+  "persistLangKey": "happybirthdayvalera.lang",
+  "models": {
+    "default": "tiny",
+    "web": {
+      "tiny": "onnx-community/whisper-tiny",
+      "base": "onnx-community/whisper-base",
+      "small": "onnx-community/whisper-small"
+    },
+    "desktop": {
+      "baseUrl": "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/",
+      "tiny": "ggml-tiny.bin",
+      "base": "ggml-base.bin",
+      "small": "ggml-small.bin"
+    }
+  }
+}

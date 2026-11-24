@@ -1,0 +1,12 @@
+node_modules/
+dist/
+target/
+.vite/
+*.tsbuildinfo
+*.tgz
+.DS_Store
+.claude/worktrees/
+.claude/settings.local.json
+# Whisper models downloaded by tests
+models/
+.cache/

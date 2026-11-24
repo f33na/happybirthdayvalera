@@ -1,0 +1,216 @@
+@import 'tailwindcss';
+@import '@evinvest/uikit/styles/tokens.css';
+/* Tailwind only emits classes it can find: the registry item and the kit's compiled components. */
+@source '../../../registry';
+@source '../../../node_modules/@evinvest/uikit/dist';
+
+/* The standard shadcn/ui token names for Tailwind v4 (neutral base colour). The kit maps its own names. */
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+}
+
+/* shadcn neutral, dark. Scoped, so the other themes keep their own values. */
+html[data-demo-theme='shadcn'] {
+  --radius: 0.625rem;
+  --background: oklch(0.145 0 0);
+  --foreground: oklch(0.985 0 0);
+  --card: oklch(0.205 0 0);
+  --popover: oklch(0.205 0 0);
+  --popover-foreground: oklch(0.985 0 0);
+  --primary: oklch(0.922 0 0);
+  --primary-foreground: oklch(0.205 0 0);
+  --secondary: oklch(0.269 0 0);
+  --secondary-foreground: oklch(0.985 0 0);
+  --muted: oklch(0.269 0 0);
+  --muted-foreground: oklch(0.708 0 0);
+  --accent: oklch(0.269 0 0);
+  --accent-foreground: oklch(0.985 0 0);
+  --destructive: oklch(0.704 0.191 22.216);
+  --border: oklch(1 0 0 / 10%);
+  --input: oklch(1 0 0 / 15%);
+  --ring: oklch(0.556 0 0);
+  --chart-1: oklch(0.488 0.243 264.376);
+  --chart-2: oklch(0.696 0.17 162.48);
+  --chart-3: oklch(0.769 0.188 70.08);
+}
+
+:root {
+  color-scheme: dark;
+  --demo-page: radial-gradient(120% 80% at 50% 0%, #1d1830 0%, #0f0d15 60%);
+  --demo-surface: #17141f;
+  --demo-text: #ece8f6;
+  --demo-muted: #9a93ad;
+  font-family: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+}
+
+body {
+  margin: 0;
+  min-height: 100dvh;
+  background: var(--demo-page);
+  color: var(--demo-text);
+}
+
+.demo {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-height: 100dvh;
+  padding: 48px 24px 0;
+  box-sizing: border-box;
+  max-width: 720px;
+  margin: 0 auto;
+}
+
+.demo h1 {
+  margin: 0;
+  font-size: 28px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+}
+
+.demo__hint {
+  margin: 0;
+  color: var(--demo-muted);
+}
+
+.demo__result {
+  flex: 1;
+  margin-top: 24px;
+  font-size: 22px;
+  line-height: 1.4;
+}
+
+/* A column, so the label sits above the field however wide the page is. */
+.demo__field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--demo-muted);
+}
+
+.demo__field textarea {
+  box-sizing: border-box;
+  width: 100%;
+  padding: 12px 14px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 12px;
+  background: var(--demo-surface);
+  color: var(--demo-text);
+  font: inherit;
+  font-size: 20px;
+  line-height: 1.4;
+  resize: vertical;
+}
+
+.demo__field textarea:focus-visible {
+  outline: 2px solid var(--demo-muted);
+  outline-offset: 2px;
+}
+
+.demo__lang {
+  margin-left: 10px;
+  padding: 2px 7px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.1);
+  font-size: 12px;
+  font-weight: 600;
+  vertical-align: middle;
+}
+
+.demo__bar {
+  position: sticky;
+  bottom: 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+  padding: 10px 12px;
+  border-radius: 999px;
+  background: var(--demo-surface);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  flex-wrap: wrap;
+}
+
+.demo__bar label {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 11px;
+  color: var(--demo-muted);
+}
+
+.demo__bar select {
+  min-width: 0;
+  padding: 4px 6px;
+  border: 0;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--demo-text);
+  font: inherit;
+  font-size: 13px;
+}
+
+.demo__spacer {
+  flex: 1;
+}
+
+.demo__themes {
+  display: flex;
+  gap: 4px;
+  width: fit-content;
+  padding: 4px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.demo__themes button {
+  padding: 6px 14px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--demo-muted);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.demo__themes button[aria-pressed='true'] {
+  background: rgba(255, 255, 255, 0.14);
+  color: var(--demo-text);
+}
+
+.demo__registry {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 32px 0 0;
+  font-size: 13px;
+  color: var(--demo-muted);
+}
+
+/* The page wears the host tokens of the active theme, so the switcher shows what the presets inherit from. */
+html[data-demo-theme='shadcn'] {
+  --demo-page: var(--background);
+  --demo-surface: var(--card);
+  --demo-text: var(--foreground);
+  --demo-muted: var(--muted-foreground);
+}
+
+html[data-demo-theme='evinvest'] {
+  --demo-page: var(--background);
+  --demo-surface: var(--secondary);
+  --demo-text: var(--ink);
+  --demo-muted: var(--ink-mid);
+}

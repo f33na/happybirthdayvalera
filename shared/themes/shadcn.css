@@ -1,0 +1,30 @@
+/*
+ * Preset for hosts on shadcn/ui (Tailwind v4: tokens are oklch values used as raw var(--name)).
+ * It only maps --hbv-* tokens to the host's variables, so it needs no Tailwind and no shadcn package.
+ * Every selector sits in :where(), so a host class always wins. For shadcn v3 (HSL triplets), override
+ * the tokens with hsl(var(--popover)) and so on.
+ */
+:where(.hbv-mic[data-hbv-theme="shadcn"], .hbv-pill[data-hbv-theme="shadcn"]) {
+  --hbv-color-pill-bg: var(--popover);
+  --hbv-color-pill-border: var(--border);
+  --hbv-color-pill-shadow: 0 4px 16px color-mix(in oklab, var(--foreground) 12%, transparent);
+  --hbv-color-text: var(--popover-foreground);
+  --hbv-color-text-muted: var(--muted-foreground);
+  --hbv-color-error: var(--destructive);
+  --hbv-color-strand-0: var(--chart-1);
+  --hbv-color-strand-1: var(--chart-2);
+  --hbv-color-strand-2: var(--chart-3);
+  --hbv-color-dot: var(--popover-foreground);
+  --hbv-color-chip-bg: var(--secondary);
+  --hbv-color-chip-bg-hover: var(--accent);
+  --hbv-color-chip-text: var(--secondary-foreground);
+  --hbv-color-mic-bg: var(--secondary);
+  --hbv-color-mic-bg-hover: var(--accent);
+  --hbv-color-mic-bg-active: var(--primary);
+  --hbv-color-mic-icon: var(--secondary-foreground);
+  --hbv-color-mic-icon-active: var(--primary-foreground);
+  --hbv-color-mic-ring: var(--ring);
+  --hbv-color-focus-ring: var(--ring);
+  --hbv-radius-chip: calc(var(--radius) - 4px);
+  --hbv-font-family: inherit;
+}
