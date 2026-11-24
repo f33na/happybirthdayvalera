@@ -69,10 +69,94 @@ Error code to string key: `mic-denied` → `error.micDenied`, `mic-unavailable` 
 - Speech starts when the RMS stays at or above `vadThresholdRms` for `minSpeechMs`.
 - `SILENCE` fires when, after speech started, the RMS stays below the threshold for `silenceMs`. There is no
   auto-stop before speech starts.
-- At `maxDurationMs` the controller sends `STOP`.
-- When `interimEveryMs > 0`, the controller transcribes the whole buffer so far at that interval while
-  listening. It skips a tick if the previous interim call has not finished. Interim text is shown, but
-  `onResult` fires only for the final text.
+- In `utterance` mode, at `maxDurationMs` the controller sends `STOP`.
+- In `utterance` mode, `SILENCE` ends the utterance as above. Drafts and continuous mode are in "Live dictation".
+
+
+## Live dictation
+
+The default `mode` is `continuous`. The old behaviour, one utterance and then stop, stays as
+`mode: 'utterance'` (`Mode::Utterance` in Rust). All new numbers are in `behavior.json` and are overridable.
+
+### Continuous mode
+
+- A tap on the mic starts listening. The microphone stays on until `STOP`: a second tap, `Esc` on the mic
+  or in a bound text field, or the auto-stop.
+- Pauses split the speech into segments. A segment ends when, after speech started in it, the RMS stays
+  below the threshold for `segmentSilenceMs`. A segment is also cut at `maxSegmentMs`, because Whisper
+  sees at most 30 s.
+- The audio of a finished segment goes to the engine with `segmentPadBeforeMs` of audio before the speech
+  start and `segmentPadAfterMs` after the speech end (clamped to the captured audio). The machine stays in
+  `listening` while segments are transcribed in the background.
+- Segment results are committed strictly in segment order. Each non-empty segment result fires
+  `onResult(text, lang)` once. An empty segment result fires nothing.
+- `text` / `text()` holds the committed text of the session so far, segments joined with one space.
+- Auto-stop: no speech for `autoStopMs` (counted from the start of listening or from the end of the last
+  speech) sends `STOP`. `maxDurationMs` does not apply to the session in this mode.
+- `STOP` in `listening`: the open segment is closed if it has speech, and the machine goes to
+  `transcribing` until every queued segment is committed. Then `RESULT` with the session text goes to
+  `idle`. If the session committed no text, `RESULT` is empty and `nothingHeard` holds as before.
+  The microphone is released when `listening` ends, as before.
+- The easter egg checks every committed segment.
+- `machine.json` does not change. In continuous mode the controller does not send `SILENCE` to the machine.
+
+### Drafts (interim text)
+
+- While a segment is open and has speech, the controller transcribes **only the audio of that segment** (with
+  `segmentPadBeforeMs`) every `interimEveryMs` (default 1000; 0 turns drafts off). The cost per draft stays
+  bounded however long the session is.
+- One engine call runs at a time. A final segment call always goes before a draft. A draft tick is skipped
+  while any engine call runs or a final call waits.
+- `interim` holds the draft of the open segment. It is cleared when that segment is committed or when the
+  segment turns out empty. A draft that comes back after its segment has closed still shows until that segment
+  is committed: the final call of the segment cannot start before the draft call ends, so with a slow model this
+  late draft is often the only one. `onInterim(text, lang)` fires for every non-empty draft.
+- In `utterance` mode drafts work the same way over the single utterance.
+
+### Hold to talk
+
+- Pointer down on the mic and hold longer than `holdMs`: the widget listens while the pointer is down. Pointer
+  up sends `STOP`. A press shorter than `holdMs` is a tap and toggles as before. Space and Enter toggle.
+- While held, the mic has `data-hold="true"`.
+- If the pointer goes down while the state is not `idle`, `nothingHeard` or `error`, it is a plain tap (stop).
+
+### Dictation into a text field
+
+A helper binds a listener to a `<textarea>` or `<input>`, so the host writes no glue code:
+
+- React: `useDictation(ref, options)` returns the same `Listener` as `useListener(options)` and binds it to
+  `ref.current`.
+- Dioxus: `use_dictation(target_id, config)` returns the same `Listener` and binds it to the element with that
+  `id` (web: through `web-sys`; desktop: through `document::eval`).
+
+Binding rules:
+
+- The insertion point is the caret (or the selection, which is replaced) at the moment a session starts. If
+  the field is not focused, it is the end of the text.
+- The draft is shown **in the field** at the insertion point as plain text, and it is replaced in place on every
+  draft and by the final text of the segment. The next segment continues right after the committed text.
+- Spacing: add one space before the inserted text when the character before it is not whitespace and not the
+  start of the field. Add one space after the inserted text when the character right after it is not whitespace,
+  not the end of the field and not punctuation that attaches to the left: `.` `,` `!` `?` `;` `:` `)` `]` `»` `”`.
+  The draft is shown with the same spaces, and the next segment continues after the trailing space. Capitalize the first letter when it is at the start of the field or after `.`, `!`
+  or `?` and whitespace. Do not change Whisper's own punctuation.
+- If the user edits outside the draft, the draft is removed, later drafts of that segment stay hidden, and its
+  final text goes to the caret. If the user edits inside the draft, the final of that segment is not inserted, so
+  the text is not repeated. Committed segments after that go to the current caret.
+- Every change fires a native `input` event so controlled inputs (React `value` + `onChange`, Dioxus
+  `oninput`) see it. React uses the native value setter of the element prototype for this.
+- Undo: commit a final segment with `document.execCommand('insertText')` while the field is focused, so the
+  browser's own Cmd/Ctrl+Z removes it in one step. Drafts must not fill the undo stack. If a browser cannot do
+  this reliably, fall back to the value setter and document the gap.
+- `Esc` in the bound field while listening sends `STOP`.
+- The pill keeps the wave, the status and the language chip. When a field is bound, the pill does not repeat
+  the draft text in `.hbv-pill__text`.
+
+### Model for self-hosted setups
+
+`just fetch-models` fetches `base` by default (`just fetch-models tiny` still works). The stands and demos read
+`HBV_MODEL` (`tiny` / `base` / `small`). When `HBV_MODEL_BASE_URL` is set and `HBV_MODEL` is not, they use
+`base`. The library default stays `tiny`, because without self-hosting it downloads from the Hub.
 
 ## Engine
 
@@ -106,9 +190,11 @@ npm package and the Dioxus web build (`crates/happybirthdayvalera/assets/whisper
 Main → worker:
 
 ```ts
-{ type: 'load', model: 'onnx-community/whisper-tiny', wasmPaths?: string, modelBaseUrl?: string }
+{ type: 'load', model: 'onnx-community/whisper-tiny', wasmPaths?: string, modelBaseUrl?: string,
+  device?: 'auto' | 'webgpu' | 'wasm' }
 // wasmPaths: onnxruntime wasm base URL; default is the CDN.
 // modelBaseUrl: self-hosted models, ends with "/" (see "Self-hosted models")
+// device: where Whisper runs, default 'auto' (see "Speed")
 { type: 'transcribe', id: number, pcm: Float32Array, lang: Lang }   // pcm buffer is transferred
 ```
 
@@ -116,12 +202,32 @@ Worker → main:
 
 ```ts
 { type: 'progress', fraction?: number }         // 0..1 over all model files; absent while any size is unknown
-{ type: 'ready' }
+{ type: 'ready', device?: 'webgpu' | 'wasm' } // the backend that actually runs
 { type: 'result', id: number, text: string }
 { type: 'error', id?: number, message: string } // id is absent for a load error
 ```
 
-A second `load` with the same model answers `ready` at once.
+A second `load` with the same model and backend answers `ready` at once.
+
+### Speed
+
+Whisper pads every input to 30 s, so one call costs about the same for 1 s and for 6 s of audio. Two things cut it:
+
+- **Threads.** onnxruntime-web runs on several threads only on a cross-origin-isolated page: the response headers
+  `Cross-Origin-Opener-Policy: same-origin` and `Cross-Origin-Embedder-Policy: require-corp` (or `credentialless`).
+  The worker then sets `numThreads = min(4, navigator.hardwareConcurrency)`; more threads were slower on an 8-core
+  M2. Without isolation it runs on one thread, as before. Every cross-origin file must then allow it with CORS or
+  `Cross-Origin-Resource-Policy`; `just serve-models` sends `Cross-Origin-Resource-Policy: cross-origin`. The React
+  stands and the demo send both headers in `vite dev` and `vite preview`.
+- **WebGPU.** `device` is `'auto'` (default), `'webgpu'` or `'wasm'` (`device` in `useListener` and `whisperEngine`).
+  WebGPU uses `encoder_model: 'fp32', decoder_model_merged: 'fp16'` (`onnx/encoder_model.onnx`,
+  `onnx/decoder_model_merged_fp16.onnx`); wasm keeps q8. The q8 files give garbage on WebGPU, and an fp16 encoder
+  breaks `base`. `'auto'` picks WebGPU only when the browser gives an adapter, `modelBaseUrl` is set (the WebGPU
+  files are about 2.4 times the q8 download) and the model is `base`. `tiny` stays on wasm: on WebGPU it misses a
+  French fixture keyword. `small` is not measured. If WebGPU fails to load under `'auto'`, the worker falls back
+  to wasm. `'webgpu'` uses WebGPU for any model and source, and fails loudly; without an adapter every choice runs
+  on wasm.
+- `just fetch-models base` also fetches the WebGPU pair of `base`.
 
 ### Self-hosted models
 
@@ -143,18 +249,23 @@ replaces all three. It is `modelBaseUrl` in TypeScript (`useListener`, `whisperE
 - On desktop the base replaces `models.desktop.baseUrl` for the download only. The checksum check and the on-disk cache do not change.
 - The default model is `tiny` (`models.default`): about 41 MB at q8 (encoder 10.1 MB, decoder 30.7 MB). `base` and `small` stay selectable.
 - Dev tooling: `just fetch-models [size]` fills `models/hosted/`, and `just serve-models` serves it on port 5299 with CORS.
-  Stands and demos opt in with `HBV_MODEL_BASE_URL` (Vite: `VITE_HBV_MODEL_BASE_URL`; Dioxus: `option_env!`).
+  Stands and demos opt in with `HBV_MODEL_BASE_URL` and pick a size with `HBV_MODEL` (Vite: `VITE_HBV_MODEL_BASE_URL`
+  and `VITE_HBV_MODEL`; Dioxus: `option_env!`).
 
 ## Public API
 
 TypeScript:
 
 ```tsx
-const listener = useListener({ lang?, persistLang?, engine?, model?, onResult?, onInterim?,
-                               interimEveryMs?, silenceMs?, easterEgg?, preload?, theme? });
+const listener = useListener({ lang?, persistLang?, engine?, model?, mode?, onResult?, onInterim?,
+                               interimEveryMs?, silenceMs?, segmentSilenceMs?, autoStopMs?,
+                               segmentPadBeforeMs?, segmentPadAfterMs?, maxSegmentMs?, holdMs?,
+                               easterEgg?, preload?, theme? });
+const listener = useDictation(ref, options); // the same listener, bound to ref.current; ref = null binds nothing
 // listener: { state, error, progress, text, interim, lang, setLang, cycleLang,
 //             start, stop, toggle, reset, celebrating, levelRef, theme,
-//             nothingHeard, langLocked, pillVisible }  (progress: number | null)
+//             nothingHeard, langLocked, pillVisible,
+//             pressStart, pressEnd, click(fromPointer), holding, bound }  (progress: number | null)
 // nothingHeard: the last RESULT was empty, until the next START. langLocked: `lang` is forced; hide the chip.
 <MicButton listener={listener} theme? className? classNames? asChild? />
 <ListenerPill listener={listener} theme? className? classNames? components? />
@@ -199,6 +310,7 @@ Both libraries render the same markup, so one stylesheet serves both. `data-stat
 ```
 
 - `aria-pressed` is `true` in `requesting`, `loading-model` and `listening`.
+- `data-hold` on the mic is `"true"` while the pointer holds it longer than `holdMs`, else `"false"`.
 - `aria-label` of the mic button is `action.stop` while `aria-pressed` is `true`, else `action.start`.
 - In `error`, the status shows the error string, and the pill gets `data-state="error"`.
 - The dots animate in `listening` and `transcribing` only.

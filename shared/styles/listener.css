@@ -21,6 +21,11 @@
   color: var(--hbv-color-mic-icon);
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
+  /* A long press is hold-to-talk: no scroll, text selection or system menu on touch screens. */
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
   transition:
     background-color var(--hbv-motion-fade) ease,
     transform var(--hbv-motion-fade) ease;
