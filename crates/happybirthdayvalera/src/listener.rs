@@ -8,7 +8,8 @@ use dioxus::prelude::*;
 use futures_channel::mpsc::{UnboundedSender, unbounded};
 
 use crate::controller::{Controller, Message, Settings};
-use crate::engine::{EngineHandle, ModelSize, normalize_base_url};
+use crate::dictation::FieldEvent;
+use crate::engine::{Device, EngineHandle, ModelSize, normalize_base_url};
 use crate::i18n::{Msg, format};
 use crate::lang::{Lang, resolve_preferred_lang};
 use crate::machine::{ErrorCode, State};
@@ -19,6 +20,53 @@ use crate::vad::VadConfig;
 
 /// A callback with the text and the language it was recognised in.
 pub type TextHandler = Rc<dyn Fn(String, Lang)>;
+
+/// How a session ends. The default comes from `behavior.json` → `mode`.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum Mode {
+    /// The microphone stays on until `STOP` or the auto-stop. Pauses split the speech into segments, and each
+    /// segment is committed as soon as it is transcribed. The default.
+    Continuous,
+    /// One utterance: the silence after speech or the maximum length ends the session.
+    Utterance,
+}
+
+impl Default for Mode {
+    fn default() -> Self {
+        BEHAVIOR.mode.parse().unwrap_or(Mode::Continuous)
+    }
+}
+
+impl Mode {
+    /// `continuous` or `utterance`.
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Mode::Continuous => "continuous",
+            Mode::Utterance => "utterance",
+        }
+    }
+}
+
+impl std::str::FromStr for Mode {
+    type Err = UnknownMode;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        [Mode::Continuous, Mode::Utterance].into_iter().find(|m| m.as_str() == s).ok_or_else(|| UnknownMode(s.to_owned()))
+    }
+}
+
+/// A mode name that is not `continuous` or `utterance`.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct UnknownMode(pub String);
+
+impl std::fmt::Display for UnknownMode {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "unknown mode `{}`", self.0)
+    }
+}
+
+impl std::error::Error for UnknownMode {}
 
 /// The listener settings. [`Default`] takes every value from `behavior.json`.
 ///
@@ -44,19 +92,35 @@ pub struct ListenerConfig {
     ///
     /// `None` keeps the public hosts. Ignored when `engine` is set.
     pub model_base_url: Option<String>,
-    /// Fires once per non-empty final text.
+    /// Web: where the default worker runs Whisper. Counts on the first render only; ignored when `engine` is set.
+    pub device: Device,
+    /// How a session ends.
+    pub mode: Mode,
+    /// Fires once per non-empty final text: per segment in continuous mode, per utterance otherwise.
     pub on_result: Option<TextHandler>,
-    /// Fires for each interim text when `interim_every_ms > 0`.
+    /// Fires for each non-empty draft when `interim_every_ms > 0`.
     pub on_interim: Option<TextHandler>,
-    /// Transcribe the audio so far at this interval while listening; `0` turns it off.
+    /// Transcribe the open segment (with its leading padding) at this interval of audio; `0` turns drafts off.
     pub interim_every_ms: u32,
-    /// After speech, this much silence stops the recording.
+    /// Utterance mode: after speech, this much silence stops the recording.
     pub silence_ms: u32,
+    /// Continuous mode: after speech, this much silence ends a segment.
+    pub segment_silence_ms: u32,
+    /// Continuous mode: no speech for this long, from the start or from the end of the last speech, sends `STOP`.
+    pub auto_stop_ms: u32,
+    /// Continuous mode: audio before the speech start that goes to the engine with a segment.
+    pub segment_pad_before_ms: u32,
+    /// Continuous mode: audio after the speech end that goes to the engine with a segment.
+    pub segment_pad_after_ms: u32,
+    /// Continuous mode: a segment is cut at this length, because Whisper sees at most 30 s.
+    pub max_segment_ms: u32,
+    /// A press on the mic longer than this is hold to talk: the release sends `STOP`.
+    pub hold_ms: u32,
     /// This much sound at or above the threshold counts as the start of speech.
     pub min_speech_ms: u32,
     /// The RMS that counts as sound.
     pub vad_threshold_rms: f32,
-    /// The recording stops at this length.
+    /// Utterance mode: the recording stops at this length.
     pub max_duration_ms: u32,
     /// Celebrate a birthday phrase in the final text.
     pub easter_egg: bool,
@@ -77,10 +141,18 @@ impl Default for ListenerConfig {
             engine: None,
             model: ModelSize::default(),
             model_base_url: None,
+            device: Device::default(),
+            mode: Mode::default(),
             on_result: None,
             on_interim: None,
             interim_every_ms: BEHAVIOR.interim_every_ms,
             silence_ms: vad.silence_ms,
+            segment_silence_ms: BEHAVIOR.segment_silence_ms,
+            auto_stop_ms: BEHAVIOR.auto_stop_ms,
+            segment_pad_before_ms: BEHAVIOR.segment_pad_before_ms,
+            segment_pad_after_ms: BEHAVIOR.segment_pad_after_ms,
+            max_segment_ms: BEHAVIOR.max_segment_ms,
+            hold_ms: BEHAVIOR.hold_ms,
             min_speech_ms: vad.min_speech_ms,
             vad_threshold_rms: vad.threshold_rms,
             max_duration_ms: vad.max_duration_ms,
@@ -99,6 +171,8 @@ impl std::fmt::Debug for ListenerConfig {
             .field("persist_lang", &self.persist_lang)
             .field("model", &self.model)
             .field("model_base_url", &self.model_base_url)
+            .field("device", &self.device)
+            .field("mode", &self.mode)
             .field("interim_every_ms", &self.interim_every_ms)
             .field("silence_ms", &self.silence_ms)
             .field("easter_egg", &self.easter_egg)
@@ -130,6 +204,10 @@ pub(crate) struct Signals {
     pub(crate) celebrating: Signal<bool>,
     pub(crate) level: Signal<f32>,
     pub(crate) theme: Signal<Theme>,
+    /// True while a press on the mic is a hold (`data-hold`).
+    pub(crate) hold: Signal<bool>,
+    /// True when [`crate::use_dictation`] bound a field; the pill then does not repeat the draft.
+    pub(crate) bound: Signal<bool>,
 }
 
 impl Listener {
@@ -152,13 +230,13 @@ impl Listener {
         (self.sig.progress)()
     }
 
-    /// The last non-empty final text of this session; cleared by `START`.
+    /// The committed text of this session, segments joined with one space; cleared by `START`.
     #[must_use]
     pub fn text(&self) -> String {
         self.sig.text.read().clone()
     }
 
-    /// The latest interim text while listening or transcribing.
+    /// The draft of the open segment while listening or transcribing.
     #[must_use]
     pub fn interim(&self) -> String {
         self.sig.interim.read().clone()
@@ -202,6 +280,18 @@ impl Listener {
         self.state() != State::Idle || self.nothing_heard() || self.celebrating()
     }
 
+    /// True while a press on the mic is a hold to talk.
+    #[must_use]
+    pub fn held(&self) -> bool {
+        (self.sig.hold)()
+    }
+
+    /// True when [`crate::use_dictation`] bound this listener to a field.
+    #[must_use]
+    pub fn bound(&self) -> bool {
+        (self.sig.bound)()
+    }
+
     /// The theme from the config.
     #[must_use]
     pub fn theme(&self) -> Theme {
@@ -220,12 +310,37 @@ impl Listener {
         status_text(self.lang(), self.state(), self.error(), self.progress(), self.nothing_heard())
     }
 
+    /// The state without subscribing the caller.
+    pub(crate) fn peek_state(&self) -> State {
+        *self.sig.state.peek()
+    }
+
+    /// A primary pointer went down on the mic: the start of a tap or of a hold to talk.
+    pub fn pointer_down(&self) {
+        self.send(Message::PointerDown);
+    }
+
+    /// The pointer went up on the mic: ends a hold to talk.
+    pub fn pointer_up(&self) {
+        self.send(Message::PointerUp);
+    }
+
+    /// The pointer left the mic or was cancelled while pressed: ends a hold to talk, and no click follows.
+    pub fn pointer_cancel(&self) {
+        self.send(Message::PointerCancel);
+    }
+
+    /// A click on the mic: toggles, unless it ends a pointer press that already started listening.
+    pub fn click(&self) {
+        self.send(Message::Click);
+    }
+
     /// Sends `START`: from `idle` or `error`, requests the microphone.
     pub fn start(&self) {
         self.send(Message::Start);
     }
 
-    /// Sends `STOP`: cancels a start, or ends the recording and transcribes it.
+    /// Sends `STOP`: cancels a start, or ends listening and commits the queued segments.
     pub fn stop(&self) {
         self.send(Message::Stop);
     }
@@ -304,6 +419,11 @@ static NEXT_ID: AtomicU32 = AtomicU32::new(1);
 #[must_use]
 #[allow(clippy::needless_pass_by_value, reason = "the contract fixes the call as `use_listener(ListenerConfig { .. })`")]
 pub fn use_listener(config: ListenerConfig) -> Listener {
+    use_listener_with(&config, None)
+}
+
+/// [`use_listener`] with an optional bound field that receives the session text.
+pub(crate) fn use_listener_with(config: &ListenerConfig, field: Option<&UnboundedSender<FieldEvent>>) -> Listener {
     let id = use_hook(|| NEXT_ID.fetch_add(1, Ordering::Relaxed));
     let persist_key = use_hook(|| CopyValue::new(config.persist_lang.then_some(BEHAVIOR.persist_lang_key.as_str())));
 
@@ -325,19 +445,21 @@ pub fn use_listener(config: ListenerConfig) -> Listener {
         celebrating: use_signal(|| false),
         level: use_signal(|| 0.0),
         theme: use_signal(|| config.theme),
+        hold: use_signal(|| false),
+        bound: use_signal(|| field.is_some()),
     };
     sync_props(sig, config.lang, config.theme);
 
-    let mut settings = use_hook(|| CopyValue::new(Settings::from_config(&config)));
-    settings.set(Settings::from_config(&config));
+    let mut settings = use_hook(|| CopyValue::new(Settings::from_config(config)));
+    settings.set(Settings::from_config(config));
 
     let tx = use_hook(|| {
         let (tx, rx) = unbounded();
         let engine = config
             .engine
             .clone()
-            .unwrap_or_else(|| platform::default_engine(config.model_base_url.as_deref().map(normalize_base_url)));
-        let controller = Controller::new(id, &sig, settings, engine, tx.clone());
+            .unwrap_or_else(|| platform::default_engine(config.model_base_url.as_deref().map(normalize_base_url), config.device));
+        let controller = Controller::new(id, &sig, settings, engine, tx.clone(), field.cloned());
         // The task belongs to this component's scope; Dioxus drops it, and with it the capture, on unmount.
         spawn(controller.run(rx, config.preload));
         CopyValue::new(tx)

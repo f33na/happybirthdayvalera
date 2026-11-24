@@ -3,28 +3,30 @@
 //! One task per listener, scoped to the calling component, owns all mutable session state and handles one
 //! message at a time: commands from the [`crate::Listener`] handle and results from short sub-tasks
 //! (microphone, model, transcription, timers). Every result carries the session number of its `START`, so a
-//! late result of a stopped session is dropped instead of being applied.
+//! late result of a stopped session is dropped instead of being applied. The segmenting, the drafts and the
+//! engine queue live in the pure [`Session`]; the controller runs its effects.
 
 use dioxus::prelude::*;
 use futures_channel::mpsc::{UnboundedReceiver, UnboundedSender, unbounded};
 use futures_util::StreamExt as _;
 use serde_json::json;
 
+use crate::dictation::FieldEvent;
 use crate::easter::is_birthday_phrase;
 use crate::engine::{EngineError, EngineHandle, ModelSize};
+use crate::gesture::HoldGesture;
 use crate::listener::{ListenerConfig, Signals, TextHandler};
 use crate::machine::{ErrorCode, Event, State, transition};
 use crate::platform::{self, Capture};
-use crate::resample::TARGET_RATE;
-use crate::vad::{Vad, VadConfig, VadEvent, rms};
+use crate::session::{Effect, Leave, Session, SessionConfig};
 use crate::wave::{smooth_level, tokens};
 
 /// The values the controller reads per message; refreshed on every render.
 #[derive(Clone)]
 pub(crate) struct Settings {
     pub(crate) model: ModelSize,
-    pub(crate) vad: VadConfig,
-    pub(crate) interim_every_ms: u32,
+    pub(crate) session: SessionConfig,
+    pub(crate) hold_ms: u32,
     pub(crate) easter_egg: bool,
     pub(crate) easter_egg_ms: u32,
     pub(crate) on_result: Option<TextHandler>,
@@ -35,13 +37,20 @@ impl Settings {
     pub(crate) fn from_config(config: &ListenerConfig) -> Self {
         Self {
             model: config.model,
-            vad: VadConfig {
+            session: SessionConfig {
+                mode: config.mode,
                 threshold_rms: config.vad_threshold_rms,
                 min_speech_ms: config.min_speech_ms,
                 silence_ms: config.silence_ms,
+                segment_silence_ms: config.segment_silence_ms,
+                auto_stop_ms: config.auto_stop_ms,
+                pad_before_ms: config.segment_pad_before_ms,
+                pad_after_ms: config.segment_pad_after_ms,
+                max_segment_ms: config.max_segment_ms,
                 max_duration_ms: config.max_duration_ms,
+                interim_every_ms: config.interim_every_ms,
             },
-            interim_every_ms: config.interim_every_ms,
+            hold_ms: config.hold_ms,
             easter_egg: config.easter_egg,
             easter_egg_ms: config.easter_egg_ms,
             on_result: config.on_result.clone(),
@@ -50,20 +59,21 @@ impl Settings {
     }
 }
 
-/// Recordings shorter than this skip the engine: Whisper invents text from such short audio.
-pub(crate) const MIN_TRANSCRIBE_SAMPLES: usize = TARGET_RATE as usize * 3 / 10;
-
 pub(crate) enum Message {
     Start,
     Stop,
     Reset,
     Kick,
+    PointerDown,
+    PointerUp,
+    PointerCancel,
+    Click,
+    HoldTimer { press: u32 },
     MicOpened { session: u32, result: Result<Capture, ErrorCode> },
     Audio { session: u32, block: Vec<f32> },
     Progress { session: u32, fraction: f32 },
     ModelLoaded { session: u32, result: Result<(), EngineError> },
-    Transcribed { session: u32, result: Result<String, EngineError> },
-    Interim { session: u32, result: Result<String, EngineError> },
+    Transcribed { session: u32, job: u32, result: Result<String, EngineError> },
     CelebrationOver { round: u32 },
 }
 
@@ -73,33 +83,37 @@ pub(crate) struct Controller {
     settings: CopyValue<Settings>,
     engine: EngineHandle,
     tx: UnboundedSender<Message>,
+    field: Option<UnboundedSender<FieldEvent>>,
     session: u32,
     capture: Option<Capture>,
-    pcm: Vec<f32>,
-    vad: Vad,
+    core: Option<Session>,
     level: f64,
-    since_interim: usize,
-    interim_busy: bool,
+    hold: HoldGesture,
     celebration: u32,
     animator: Option<document::Eval>,
 }
 
 impl Controller {
-    pub(crate) fn new(id: u32, sig: &Signals, settings: CopyValue<Settings>, engine: EngineHandle, tx: UnboundedSender<Message>) -> Self {
-        let vad = Vad::new(settings.peek().vad);
+    pub(crate) fn new(
+        id: u32,
+        sig: &Signals,
+        settings: CopyValue<Settings>,
+        engine: EngineHandle,
+        tx: UnboundedSender<Message>,
+        field: Option<UnboundedSender<FieldEvent>>,
+    ) -> Self {
         Self {
             id,
             sig: *sig,
             settings,
             engine,
             tx,
+            field,
             session: 0,
             capture: None,
-            pcm: Vec::new(),
-            vad,
+            core: None,
             level: 0.0,
-            since_interim: 0,
-            interim_busy: false,
+            hold: HoldGesture::default(),
             celebration: 0,
             animator: None,
         }
@@ -132,6 +146,27 @@ impl Controller {
                 }
             }
             Message::Kick => self.animate(&json!({ "type": "kick" })),
+            Message::PointerDown => self.pointer_down(),
+            Message::PointerUp => {
+                if self.hold.up() {
+                    self.hold_ended();
+                }
+            }
+            Message::PointerCancel => {
+                if self.hold.cancel() {
+                    self.hold_ended();
+                }
+            }
+            Message::Click => {
+                if self.hold.click() {
+                    if self.state().is_pressed() { self.stop() } else { self.start() }
+                }
+            }
+            Message::HoldTimer { press } => {
+                if self.hold.timer(press) {
+                    self.sig.hold.set(true);
+                }
+            }
             Message::MicOpened { session, result } => self.mic_opened(session, result),
             Message::Audio { session, block } => self.audio(session, &block),
             Message::Progress { session, fraction } => {
@@ -141,8 +176,14 @@ impl Controller {
                 }
             }
             Message::ModelLoaded { session, result } => self.model_loaded(session, result),
-            Message::Transcribed { session, result } => self.transcribed(session, result),
-            Message::Interim { session, result } => self.interim(session, result),
+            Message::Transcribed { session, job, result } => {
+                if session == self.session
+                    && let Some(core) = &mut self.core
+                {
+                    let fx = core.engine_done(job, result);
+                    self.run_effects(fx);
+                }
+            }
             Message::CelebrationOver { round } => {
                 if round == self.celebration {
                     self.sig.celebrating.set(false);
@@ -176,9 +217,30 @@ impl Controller {
         }
     }
 
-    fn post(&self, message: Message) {
-        // The receiver lives as long as this controller, so a send fails only during teardown.
-        let _ = self.tx.unbounded_send(message);
+    fn to_field(&self, event: FieldEvent) {
+        if let Some(field) = &self.field {
+            // The binding task lives as long as the component that owns this controller; a failed send means
+            // that component is going away, and there is no field left to update.
+            let _ = field.unbounded_send(event);
+        }
+    }
+
+    fn pointer_down(&mut self) {
+        let can_start = matches!(self.state(), State::Idle | State::Error);
+        let Some(press) = self.hold.down(can_start) else { return };
+        self.start();
+        let ms = self.settings.peek().hold_ms;
+        let tx = self.tx.clone();
+        spawn(async move {
+            platform::sleep_ms(ms).await;
+            // See `to_field`: a send fails only during teardown.
+            let _ = tx.unbounded_send(Message::HoldTimer { press });
+        });
+    }
+
+    fn hold_ended(&mut self) {
+        self.sig.hold.set(false);
+        self.stop();
     }
 
     fn start(&mut self) {
@@ -198,7 +260,8 @@ impl Controller {
             sig.celebrating.set(false);
             self.animate(&json!({ "type": "celebrate", "on": false }));
         }
-        self.pcm.clear();
+        self.core = None;
+        self.to_field(FieldEvent::Start);
 
         let session = self.session;
         let (blocks_tx, mut blocks_rx) = unbounded::<Vec<f32>>();
@@ -232,6 +295,7 @@ impl Controller {
             Err(code) => {
                 self.dispatch(Event::MicFailed);
                 self.sig.error.set(Some(code));
+                self.to_field(FieldEvent::End);
             }
         }
     }
@@ -244,7 +308,7 @@ impl Controller {
         spawn(async move {
             let progress_tx = tx.clone();
             let on_progress = move |fraction: f32| {
-                // See `post`: a send fails only during teardown.
+                // See `to_field`: a send fails only during teardown.
                 let _ = progress_tx.unbounded_send(Message::Progress { session, fraction });
             };
             let result = engine.load(model, &on_progress).await;
@@ -258,11 +322,8 @@ impl Controller {
         }
         match result {
             Ok(()) => {
-                self.vad = Vad::new(self.settings.peek().vad);
-                self.pcm.clear();
+                self.core = Some(Session::new(self.settings.peek().session));
                 self.level = 0.0;
-                self.since_interim = 0;
-                self.interim_busy = false;
                 self.dispatch(Event::ModelReady);
                 self.engine.begin(*self.sig.lang.peek());
             }
@@ -271,6 +332,7 @@ impl Controller {
                 self.capture = None;
                 self.dispatch(Event::ModelFailed);
                 self.sig.error.set(Some(e.code().unwrap_or(ErrorCode::ModelFailed)));
+                self.to_field(FieldEvent::End);
             }
         }
     }
@@ -282,34 +344,27 @@ impl Controller {
                 self.capture = None;
                 // Results of the cancelled start must not apply to the next session.
                 self.session = self.session.wrapping_add(1);
+                self.to_field(FieldEvent::End);
             }
-            State::Listening => self.finish(Event::Stop),
+            State::Listening => {
+                self.leave(Event::Stop);
+                if let Some(core) = &mut self.core {
+                    let fx = core.stop();
+                    self.run_effects(fx);
+                }
+            }
             State::Idle | State::Transcribing | State::Error => {}
         }
     }
 
-    /// Leaves `listening`: releases the microphone at once, then transcribes.
-    fn finish(&mut self, event: Event) {
+    /// Leaves `listening` and releases the microphone at once; queued segments go on in `transcribing`.
+    fn leave(&mut self, event: Event) {
         if !self.dispatch(event) {
             return;
         }
         self.capture = None;
         self.level = 0.0;
         self.sig.level.set(0.0);
-        let pcm = std::mem::take(&mut self.pcm);
-        let session = self.session;
-        if !self.vad.heard_speech() || pcm.len() < MIN_TRANSCRIBE_SAMPLES {
-            self.post(Message::Transcribed { session, result: Ok(String::new()) });
-            return;
-        }
-        let engine = self.engine.clone();
-        let lang = *self.sig.lang.peek();
-        let tx = self.tx.clone();
-        spawn(async move {
-            let result = engine.transcribe(pcm, lang).await;
-            // See `post`: a send fails only during teardown.
-            let _ = tx.unbounded_send(Message::Transcribed { session, result });
-        });
     }
 
     fn audio(&mut self, session: u32, block: &[f32]) {
@@ -317,102 +372,81 @@ impl Controller {
         if session != self.session || self.state() != State::Listening {
             return;
         }
-        let level = rms(block);
-        self.pcm.extend_from_slice(block);
+        let level = crate::vad::rms(block);
         self.level = smooth_level(tokens(), self.level, f64::from(level));
         #[allow(clippy::cast_possible_truncation, reason = "a level in 0..=1")]
         self.sig.level.set(self.level as f32);
         self.animate(&json!({ "type": "level", "rms": level }));
-
-        #[allow(clippy::cast_precision_loss, reason = "a block holds a few hundred samples")]
-        let block_ms = block.len() as f64 * 1000.0 / f64::from(TARGET_RATE);
-        match self.vad.push(level, block_ms) {
-            Some(VadEvent::Silence) => return self.finish(Event::Silence),
-            Some(VadEvent::MaxDuration) => return self.finish(Event::Stop),
-            Some(VadEvent::SpeechStarted) | None => {}
-        }
-        self.maybe_interim(block.len());
-    }
-
-    fn maybe_interim(&mut self, added: usize) {
-        let every_ms = self.settings.peek().interim_every_ms;
-        if every_ms == 0 {
-            return;
-        }
-        self.since_interim += added;
-        let every = TARGET_RATE as usize * every_ms as usize / 1000;
-        if self.since_interim < every {
-            return;
-        }
-        self.since_interim = 0;
-        // Skip the tick while the previous interim call runs, and before there is speech to transcribe.
-        if self.interim_busy || !self.vad.heard_speech() || self.pcm.len() < MIN_TRANSCRIBE_SAMPLES {
-            return;
-        }
-        self.interim_busy = true;
-        let engine = self.engine.clone();
-        let pcm = self.pcm.clone();
-        let lang = *self.sig.lang.peek();
-        let session = self.session;
-        let tx = self.tx.clone();
-        spawn(async move {
-            let result = engine.transcribe(pcm, lang).await;
-            let _ = tx.unbounded_send(Message::Interim { session, result });
-        });
-    }
-
-    fn interim(&mut self, session: u32, result: Result<String, EngineError>) {
-        if session != self.session {
-            return;
-        }
-        self.interim_busy = false;
-        if !matches!(self.state(), State::Listening | State::Transcribing) {
-            return;
-        }
-        match result {
-            Ok(text) => {
-                let text = text.trim().to_owned();
-                if text.is_empty() {
-                    return;
-                }
-                self.sig.interim.set(text.clone());
-                let handler = self.settings.peek().on_interim.clone();
-                if let Some(handler) = handler {
-                    handler(text, *self.sig.lang.peek());
-                }
-            }
-            Err(e) => tracing::debug!("an interim transcription failed: {e}"),
+        if let Some(core) = &mut self.core {
+            let fx = core.audio(block);
+            self.run_effects(fx);
         }
     }
 
-    fn transcribed(&mut self, session: u32, result: Result<String, EngineError>) {
-        if session != self.session || self.state() != State::Transcribing {
+    fn run_effects(&mut self, effects: Vec<Effect>) {
+        for effect in effects {
+            match effect {
+                Effect::Transcribe { job, pcm } => {
+                    let engine = self.engine.clone();
+                    let lang = *self.sig.lang.peek();
+                    let session = self.session;
+                    let tx = self.tx.clone();
+                    spawn(async move {
+                        let result = engine.transcribe(pcm, lang).await;
+                        // See `to_field`: a send fails only during teardown.
+                        let _ = tx.unbounded_send(Message::Transcribed { session, job: job.id, result });
+                    });
+                }
+                Effect::Interim { segment, text } => {
+                    self.sig.interim.set(text.clone());
+                    if !text.is_empty()
+                        && let Some(handler) = self.settings.peek().on_interim.clone()
+                    {
+                        handler(text.clone(), *self.sig.lang.peek());
+                    }
+                    self.to_field(FieldEvent::Draft { segment, text });
+                }
+                Effect::Commit { segment, text } => self.commit(segment, text),
+                Effect::Leave(why) => self.leave(match why {
+                    Leave::Silence => Event::Silence,
+                    Leave::Stop => Event::Stop,
+                }),
+                Effect::Done { text, failed } => self.done(&text, failed),
+            }
+        }
+    }
+
+    fn commit(&mut self, segment: u32, text: String) {
+        let mut sig = self.sig;
+        let mut all = sig.text.peek().clone();
+        if !all.is_empty() {
+            all.push(' ');
+        }
+        all.push_str(&text);
+        sig.text.set(all);
+        let settings = self.settings.peek().clone();
+        if settings.easter_egg && is_birthday_phrase(&text) {
+            self.celebrate(settings.easter_egg_ms);
+        }
+        self.to_field(FieldEvent::Commit { segment, text: text.clone() });
+        if let Some(handler) = settings.on_result {
+            handler(text, *self.sig.lang.peek());
+        }
+    }
+
+    fn done(&mut self, text: &str, failed: bool) {
+        self.core = None;
+        let mut sig = self.sig;
+        sig.interim.set(String::new());
+        self.to_field(FieldEvent::End);
+        if failed && text.is_empty() {
+            self.dispatch(Event::TranscribeFailed);
+            sig.error.set(Some(ErrorCode::TranscribeFailed));
             return;
         }
-        match result {
-            Ok(text) => {
-                let text = text.trim().to_owned();
-                self.dispatch(Event::Result);
-                let mut sig = self.sig;
-                sig.interim.set(String::new());
-                if text.is_empty() {
-                    sig.nothing_heard.set(true);
-                    return;
-                }
-                sig.text.set(text.clone());
-                let settings = self.settings.peek().clone();
-                if settings.easter_egg && is_birthday_phrase(&text) {
-                    self.celebrate(settings.easter_egg_ms);
-                }
-                if let Some(handler) = settings.on_result {
-                    handler(text, *self.sig.lang.peek());
-                }
-            }
-            Err(e) => {
-                tracing::warn!("transcription failed: {e}");
-                self.dispatch(Event::TranscribeFailed);
-                self.sig.error.set(Some(ErrorCode::TranscribeFailed));
-            }
+        self.dispatch(Event::Result);
+        if text.is_empty() {
+            sig.nothing_heard.set(true);
         }
     }
 

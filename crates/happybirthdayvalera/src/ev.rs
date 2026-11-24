@@ -42,7 +42,8 @@ pub fn EvMicButton(
     let variant = if p.state.is_pressed() { ButtonVariant::Primary } else { ButtonVariant::Secondary };
     let kit = button_classes(&variant, size, true, None, "");
     let style = format!("{}; {EV_MIC_SIZE}", p.style);
-    let click = p.clone();
+    let (click, down, up, leave, cancel, key, md) =
+        (p.clone(), p.clone(), p.clone(), p.clone(), p.clone(), p.clone(), p.clone());
     rsx! {
         document::Stylesheet { href: STYLESHEET }
         button {
@@ -53,10 +54,17 @@ pub fn EvMicButton(
             "data-hbv-theme": p.data_theme,
             "data-hbv-listener": p.data_listener,
             "data-celebrate": p.data_celebrate,
+            "data-hold": p.data_hold,
             aria_pressed: p.aria_pressed,
             aria_label: p.aria_label,
             style,
             onclick: move |_| click.click(),
+            onmousedown: move |e| md.mouse_down(&e),
+            onpointerdown: move |e| down.pointer_down(&e),
+            onpointerup: move |_| up.pointer_up(),
+            onpointerleave: move |_| leave.pointer_cancel(),
+            onpointercancel: move |_| cancel.pointer_cancel(),
+            onkeydown: move |e| key.key_down(&e),
             onmounted: move |_| listener.kick(),
             MicParts { ring_class: class_names.ring, icon_class: class_names.icon }
         }

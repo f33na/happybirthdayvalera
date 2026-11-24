@@ -3,10 +3,8 @@
 
 mod ui;
 
-use std::rc::Rc;
-
 use dioxus::prelude::*;
-use happybirthdayvalera::{ListenerConfig, ListenerPill, MicButton, MicClassNames, PillClassNames, Theme, use_listener};
+use happybirthdayvalera::{ListenerConfig, ListenerPill, MicButton, MicClassNames, ModelSize, PillClassNames, Theme, use_dictation};
 
 use crate::ui::{
     Badge, BadgeVariant, Button, ButtonSize, ButtonVariant, Card, CardAction, CardContent, CardDescription,
@@ -20,13 +18,23 @@ fn main() {
     dioxus::launch(App);
 }
 
-/// Appends a transcript to the draft with one space between them.
-fn append(draft: &str, text: &str) -> String {
-    let text = text.trim();
-    if draft.trim_end().is_empty() {
-        text.to_owned()
-    } else {
-        format!("{} {text}", draft.trim_end())
+/// Self-hosted models (`just serve-models`); read at build time, so set it before `dx serve`.
+fn model_base_url() -> Option<String> {
+    option_env!("HBV_MODEL_BASE_URL").filter(|url| !url.is_empty()).map(str::to_owned)
+}
+
+/// `HBV_MODEL` (`tiny`, `base` or `small`) at build time. Without it, self-hosted models use `base`, and the
+/// public hosts keep the library default.
+fn model() -> ModelSize {
+    model_for(option_env!("HBV_MODEL"), model_base_url().is_some())
+}
+
+fn model_for(name: Option<&str>, self_hosted: bool) -> ModelSize {
+    match name.filter(|name| !name.is_empty()) {
+        // A wrong name is a build setup mistake on a dev machine; failing loudly beats a silent `tiny`.
+        Some(name) => name.parse().expect("HBV_MODEL is tiny, base or small"),
+        None if self_hosted => ModelSize::Base,
+        None => ModelSize::default(),
     }
 }
 
@@ -35,20 +43,18 @@ fn App() -> Element {
     let mut dark = use_signal(|| false);
     let mut draft = use_signal(String::new);
     let mut sent = use_signal(Vec::<String>::new);
-    let listener = use_listener(ListenerConfig {
-        theme: Theme::Shadcn,
-        easter_egg: true,
-        persist_lang: true,
-        // Self-hosted models (`just serve-models`); read at build time, so set it before `dx serve`.
-        model_base_url: option_env!("HBV_MODEL_BASE_URL").filter(|url| !url.is_empty()).map(str::to_owned),
-        on_result: Some(Rc::new(move |text, _lang| {
-            // Signals are Copy; a local copy is mutable inside the shared Fn.
-            let mut draft = draft;
-            let next = append(&draft.peek(), &text);
-            draft.set(next);
-        })),
-        ..Default::default()
-    });
+    // The listener writes into the textarea itself; its `input` events keep `draft` in sync.
+    let listener = use_dictation(
+        "message",
+        ListenerConfig {
+            theme: Theme::Shadcn,
+            easter_egg: true,
+            persist_lang: true,
+            model: model(),
+            model_base_url: model_base_url(),
+            ..Default::default()
+        },
+    );
 
     let can_send = !draft.read().trim().is_empty();
     let send = move |_| {
@@ -151,12 +157,16 @@ fn ThemeIcon(dark: bool) -> Element {
 
 #[cfg(test)]
 mod tests {
-    use super::append;
+    use happybirthdayvalera::ModelSize;
+
+    use super::model_for;
 
     #[test]
-    fn append_puts_one_space_between_parts() {
-        assert_eq!(append("", " Hello "), "Hello");
-        assert_eq!(append("Hello  ", "world"), "Hello world");
-        assert_eq!(append("   ", "world"), "world");
+    fn self_hosted_models_default_to_base() {
+        assert_eq!(model_for(None, true), ModelSize::Base);
+        assert_eq!(model_for(Some(""), true), ModelSize::Base);
+        assert_eq!(model_for(None, false), ModelSize::default());
+        assert_eq!(model_for(Some("tiny"), true), ModelSize::Tiny);
+        assert_eq!(model_for(Some("small"), false), ModelSize::Small);
     }
 }

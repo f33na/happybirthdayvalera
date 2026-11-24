@@ -3,7 +3,8 @@
 A small "voice dictation composer" screen. It shows the widget as a host app on shadcn/ui would use it:
 
 - a card with a title and a badge with the active language,
-- a textarea that each final transcript appends to,
+- a textarea bound with `use_dictation`: drafts appear in it while you speak and are replaced by the
+  final text of each segment,
 - a toolbar row with the mic, the pill while it is visible, and a Send button,
 - a dark mode switch.
 
@@ -20,11 +21,12 @@ placeholders, the page renders, but the pill reports a model error.
 
 To load the models from a local host instead of the Hugging Face Hub, run `just fetch-models` and
 `just serve-models`, then start the stand with `HBV_MODEL_BASE_URL=http://localhost:5299/`. The stand reads
-the variable at build time.
+the variable at build time. With self-hosted models it uses Whisper `base`; set `HBV_MODEL=tiny` (or `small`)
+to pick another size.
 
 ## What it proves
 
-- The stand uses only the public API of the crate: `use_listener`, `ListenerConfig`, `MicButton`,
+- The stand uses only the public API of the crate: `use_dictation`, `ListenerConfig`, `ModelSize`, `MicButton`,
   `ListenerPill`, `MicClassNames`, `PillClassNames` and `Theme::Shadcn`.
 - `Theme::Shadcn` maps the `--hbv-*` tokens to the shadcn variables (`--popover`, `--secondary`,
   `--chart-1` and so on). The dark mode switch sets `.dark` on a wrapper, so the widget recolours live,

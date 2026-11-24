@@ -15,7 +15,7 @@ use wasm_bindgen::prelude::Closure;
 use wasm_bindgen::{JsCast as _, JsValue};
 use web_sys::{ErrorEvent, MessageEvent, Worker, WorkerOptions, WorkerType};
 
-use crate::engine::{EngineError, ModelSize, SpeechEngine, normalize_base_url};
+use crate::engine::{Device, EngineError, ModelSize, SpeechEngine, normalize_base_url};
 use crate::lang::Lang;
 
 /// The worker is a finished ES module from the TS build, so `dx` must ship it byte for byte under a hashed name.
@@ -64,6 +64,7 @@ pub struct WorkerEngine {
     url: String,
     wasm_paths: Option<String>,
     model_base_url: Option<String>,
+    device: Device,
     inner: Rc<RefCell<Inner>>,
 }
 
@@ -82,7 +83,7 @@ impl WorkerEngine {
 
     /// An engine over a worker script that speaks the same protocol.
     pub fn with_worker_url(url: impl Into<String>) -> Self {
-        Self { url: url.into(), wasm_paths: None, model_base_url: None, inner: Rc::default() }
+        Self { url: url.into(), wasm_paths: None, model_base_url: None, device: Device::Auto, inner: Rc::default() }
     }
 
     /// Sends `wasmPaths` (the base URL of the onnxruntime wasm files) with every `load`, for offline hosts.
@@ -98,6 +99,13 @@ impl WorkerEngine {
     #[must_use]
     pub fn model_base_url(mut self, base_url: impl AsRef<str>) -> Self {
         self.model_base_url = Some(normalize_base_url(base_url.as_ref()));
+        self
+    }
+
+    /// Sends `device` with every `load`; [`Device::Auto`] leaves the choice to the worker.
+    #[must_use]
+    pub fn device(mut self, device: Device) -> Self {
+        self.device = device;
         self
     }
 
@@ -207,6 +215,9 @@ impl SpeechEngine for WorkerEngine {
                 }
                 if let Some(base) = &self.model_base_url {
                     set(&msg, "modelBaseUrl", &JsValue::from_str(base));
+                }
+                if self.device != Device::Auto {
+                    set(&msg, "device", &JsValue::from_str(self.device.as_str()));
                 }
                 if let Err(e) = worker.post_message(&msg) {
                     inner.fail_all(&format!("cannot post `load`: {e:?}"));

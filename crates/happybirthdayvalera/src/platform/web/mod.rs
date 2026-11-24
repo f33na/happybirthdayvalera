@@ -12,23 +12,26 @@ use std::collections::HashMap;
 use wasm_bindgen::JsCast as _;
 use wasm_bindgen::prelude::Closure;
 
-use crate::engine::EngineHandle;
+use crate::engine::{Device, EngineHandle};
 use crate::lang::Lang;
 
 thread_local! {
-    // One worker per page, so every listener shares one loaded model instead of one each.
-    static ENGINE: EngineHandle = EngineHandle::new(WorkerEngine::new());
-    // The same rule per self-hosted base URL: listeners that name one host share its worker.
-    static HOSTED: RefCell<HashMap<String, EngineHandle>> = RefCell::new(HashMap::new());
+    // One worker per model host and device, so every listener that shares them shares one loaded model.
+    static ENGINES: RefCell<HashMap<(Option<String>, Device), EngineHandle>> = RefCell::new(HashMap::new());
 }
 
 /// `model_base_url` arrives normalized, so one host maps to one key.
-pub(crate) fn default_engine(model_base_url: Option<String>) -> EngineHandle {
-    let Some(base) = model_base_url else { return ENGINE.with(Clone::clone) };
-    HOSTED.with_borrow_mut(|hosted| {
-        hosted
-            .entry(base)
-            .or_insert_with_key(|base| EngineHandle::new(WorkerEngine::new().model_base_url(base)))
+pub(crate) fn default_engine(model_base_url: Option<String>, device: Device) -> EngineHandle {
+    ENGINES.with_borrow_mut(|engines| {
+        engines
+            .entry((model_base_url, device))
+            .or_insert_with_key(|(base, device)| {
+                let engine = WorkerEngine::new().device(*device);
+                EngineHandle::new(match base {
+                    Some(base) => engine.model_base_url(base),
+                    None => engine,
+                })
+            })
             .clone()
     })
 }

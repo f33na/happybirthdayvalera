@@ -1,5 +1,6 @@
 //! The contract markup: `MicButton`, `ListenerPill` and `Waveform`, and the headless helpers they use.
 
+use dioxus::html::input_data::MouseButton;
 use dioxus::prelude::*;
 
 use crate::i18n::{Msg, format};
@@ -14,8 +15,11 @@ pub const STYLESHEET: Asset = asset!("/assets/listener.css");
 
 /// Everything a host needs to render its own mic button for a listener.
 ///
-/// Put `aria_pressed`, `aria_label`, `data_state`, `data_theme` and `data_listener` on the element, add the
-/// `hbv-mic` class to get the shared CSS and the level animation, and call [`MicAttrs::click`] on click.
+/// Put `aria_pressed`, `aria_label`, `data_state`, `data_theme`, `data_listener` and `data_hold` on the
+/// element, add the `hbv-mic` class to get the shared CSS and the level animation, and call
+/// [`MicAttrs::click`] on click. For hold to talk, also call [`MicAttrs::pointer_down`],
+/// [`MicAttrs::pointer_up`] and [`MicAttrs::pointer_cancel`] (on `pointerleave` and `pointercancel`), and
+/// [`MicAttrs::key_down`] for `Esc`. Calling [`MicAttrs::mouse_down`] keeps the focus in a bound text field.
 #[derive(Clone, Debug, PartialEq)]
 pub struct MicAttrs {
     /// The listener.
@@ -34,15 +38,68 @@ pub struct MicAttrs {
     pub data_listener: String,
     /// `"true"` while the easter egg plays.
     pub data_celebrate: &'static str,
+    /// `"true"` while a press is a hold to talk.
+    pub data_hold: &'static str,
+    /// True when [`crate::use_dictation`] bound a text field to the listener.
+    pub bound: bool,
     /// The initial inline style; the animator updates `--hbv-level` per frame afterwards.
     pub style: &'static str,
 }
 
 impl MicAttrs {
-    /// The click action: `STOP` while pressed, else `START`.
+    /// The click action: `STOP` while pressed, else `START`. A click that ends a pointer press which already
+    /// started listening does nothing.
     pub fn click(&self) {
-        self.listener.toggle();
+        self.listener.click();
     }
+
+    /// `pointerdown`: only the primary button of the primary pointer starts a press. The mic captures the
+    /// pointer, so the release reaches it even off the button.
+    pub fn pointer_down(&self, event: &PointerData) {
+        if event.is_primary() && event.trigger_button() == Some(MouseButton::Primary) {
+            capture_pointer(&self.data_listener, event);
+            self.listener.pointer_down();
+        }
+    }
+
+    /// `pointerup`: ends a hold to talk.
+    pub fn pointer_up(&self) {
+        self.listener.pointer_up();
+    }
+
+    /// `pointerleave` and `pointercancel`: end a hold to talk.
+    pub fn pointer_cancel(&self) {
+        self.listener.pointer_cancel();
+    }
+
+    /// `mousedown`: with a bound text field, keeps the focus and the caret in that field, which is the
+    /// insertion point.
+    pub fn mouse_down(&self, event: &MouseEvent) {
+        if self.bound {
+            event.prevent_default();
+        }
+    }
+
+    /// `keydown`: `Esc` sends `STOP` while the mic is pressed.
+    pub fn key_down(&self, event: &KeyboardEvent) {
+        if event.key() == Key::Escape && self.state.is_pressed() {
+            self.listener.stop();
+        }
+    }
+}
+
+/// Captures the pointer on the mic of this listener under the pointer. Dioxus hands out no element for
+/// `setPointerCapture`, so a one-line script does it, on the web and in the desktop webview alike.
+fn capture_pointer(listener: &str, event: &PointerData) {
+    let point = event.client_coordinates();
+    let script = format!(
+        "const p = document.elementFromPoint({x}, {y});         const m = p && p.closest('.hbv-mic[data-hbv-listener=\"{listener}\"]');         if (m) {{ try {{ m.setPointerCapture({id}); }} catch (_) {{}} }}",
+        x = point.x,
+        y = point.y,
+        id = event.pointer_id(),
+    );
+    // Fire and forget: without capture, `pointerleave` still ends a hold.
+    let _ = document::eval(&script);
 }
 
 /// The aria, data and click props of the mic button, for hosts that render their own element.
@@ -61,6 +118,8 @@ pub fn mic_button_props(listener: Listener, theme: Option<Theme>) -> MicAttrs {
         data_theme: theme.unwrap_or_else(|| listener.theme()).as_str(),
         data_listener: listener.dom_id().to_string(),
         data_celebrate: if listener.celebrating() { "true" } else { "false" },
+        data_hold: if listener.held() { "true" } else { "false" },
+        bound: listener.bound(),
         style: "--hbv-level: 0",
     }
 }
@@ -78,8 +137,8 @@ pub struct PillAttrs {
     pub aria_label: String,
     /// The status line.
     pub status: String,
-    /// The interim text while listening or transcribing, the final text in `idle` and while celebrating;
-    /// `None` when empty.
+    /// The draft while listening or transcribing (not when a text field is bound: the field shows it), the
+    /// session text in `idle` and while celebrating; `None` when empty.
     pub text: Option<String>,
     /// The active language.
     pub lang: Lang,
@@ -96,6 +155,7 @@ pub fn pill_props(listener: Listener, theme: Option<Theme>) -> PillAttrs {
     let lang = listener.lang();
     let text = match state {
         _ if listener.celebrating() => listener.text(),
+        State::Listening | State::Transcribing if listener.bound() => String::new(),
         State::Listening | State::Transcribing => listener.interim(),
         State::Idle if !listener.nothing_heard() => listener.text(),
         State::Idle | State::Requesting | State::LoadingModel | State::Error => String::new(),
@@ -139,7 +199,8 @@ pub fn MicButton(
     class_names: MicClassNames,
 ) -> Element {
     let p = mic_button_props(listener, theme);
-    let click = p.clone();
+    let (click, down, up, leave, cancel, key, md) =
+        (p.clone(), p.clone(), p.clone(), p.clone(), p.clone(), p.clone(), p.clone());
     rsx! {
         document::Stylesheet { href: STYLESHEET }
         button {
@@ -149,10 +210,17 @@ pub fn MicButton(
             "data-hbv-theme": p.data_theme,
             "data-hbv-listener": p.data_listener,
             "data-celebrate": p.data_celebrate,
+            "data-hold": p.data_hold,
             aria_pressed: p.aria_pressed,
             aria_label: p.aria_label,
             style: p.style,
             onclick: move |_| click.click(),
+            onmousedown: move |e| md.mouse_down(&e),
+            onpointerdown: move |e| down.pointer_down(&e),
+            onpointerup: move |_| up.pointer_up(),
+            onpointerleave: move |_| leave.pointer_cancel(),
+            onpointercancel: move |_| cancel.pointer_cancel(),
+            onkeydown: move |e| key.key_down(&e),
             onmounted: move |_| listener.kick(),
             MicParts { ring_class: class_names.ring, icon_class: class_names.icon }
         }

@@ -27,6 +27,18 @@ fn Toolbar() -> Element {
 }
 ```
 
+To dictate into a text field, use `use_dictation` instead. It returns the same `Listener` and writes the text
+into the `<textarea>` or `<input>` with that id, so you write no glue code:
+
+```rust,ignore
+let mut message = use_signal(String::new);
+let listener = use_dictation("message", ListenerConfig::default());
+rsx! {
+    textarea { id: "message", value: message(), oninput: move |e| message.set(e.value()) }
+    MicButton { listener }
+}
+```
+
 ## Features
 
 The crate does not enable a Dioxus renderer; your app does. Pick the feature that matches it:
@@ -82,6 +94,29 @@ and jsDelivr. The default engine adds a missing trailing `/` and expects this la
 The option counts on the first render only, and it is ignored when `ListenerConfig::engine` is set. For a
 custom engine, use `WorkerEngine::model_base_url` (web) or `ModelStore::with_base_url` (desktop).
 
+### Faster web inference: cross-origin isolation
+
+The Web Worker runs Whisper on WebAssembly, and it uses up to 4 threads only when the page is cross-origin
+isolated (`self.crossOriginIsolated`); otherwise it runs on one thread, about 2.5 times slower. Serve the page
+with these two headers:
+
+```text
+Cross-Origin-Opener-Policy: same-origin
+Cross-Origin-Embedder-Policy: require-corp
+```
+
+- With `require-corp`, every cross-origin resource of the page must allow the embedding: a CORS response
+  (`Access-Control-Allow-Origin`), or `Cross-Origin-Resource-Policy: cross-origin`. Google Fonts, the Hugging
+  Face Hub and jsDelivr already send these. A self-hosted model server must send them too; `just serve-models`
+  does.
+- `Cross-Origin-Embedder-Policy: credentialless` is the looser option: Chromium and Firefox then load
+  cross-origin resources without credentials and without CORP. Safari does not support it.
+- In development, `dx serve --platform web --cross-origin-policy` sends both headers. The `just` recipes of
+  the demo and the stands pass this flag; dx 0.7.9 has no `Dioxus.toml` key for it.
+- `ListenerConfig::device` (`Device::Auto`, `Device::Webgpu`, `Device::Wasm`) selects where the default
+  worker runs Whisper. `Auto` lets the worker decide: WebGPU for `base` when the models are self-hosted and
+  the browser has an adapter, else WebAssembly. Desktop ignores it.
+
 macOS asks for microphone access on the first capture. A bundled desktop app needs
 `NSMicrophoneUsageDescription` in its `Info.plist`.
 
@@ -90,9 +125,28 @@ macOS asks for microphone access on the first capture. A bundled desktop app nee
 - **Language.** A forced `ListenerConfig::lang`, else the stored choice (web, with `persist_lang`), else the
   first supported language of the browser or OS locales, else English. The chip cycles EN → RU → DE → FR.
   Whisper always gets the language as a forced token.
-- **Dictation.** The widget records while it listens and transcribes when you stop. After speech, about 1.5 s
-  of silence stops it by itself; 30 s is the limit. A recording without speech, or under 0.3 s, skips the
-  engine and shows "Didn't catch that".
+- **Continuous dictation** (`Mode::Continuous`, the default). A tap starts listening, and the microphone stays
+  on until a second tap, `Esc`, or 8 s without speech. A pause of 0.7 s ends a segment. The segment goes to
+  the engine with 200 ms of audio before the speech and 300 ms after it, while listening goes on, and its text
+  is committed at once: `on_result` fires per segment, in order. A segment is cut at 28 s, because Whisper
+  sees at most 30 s. `Listener::text` holds the session text so far.
+- **Drafts.** Every second of speech, the widget transcribes the open segment alone, so the cost of a draft
+  stays bounded. `Listener::interim` and `on_interim` carry it. A draft never delays a final segment.
+- **One utterance** (`Mode::Utterance`). The old behaviour: after speech, about 1.5 s of silence stops the
+  recording; 30 s is the limit. A recording without speech, or under 0.3 s, skips the engine and shows
+  "Didn't catch that".
+- **Hold to talk.** Press and hold the mic longer than 300 ms: it listens until you let go, and the button
+  gets `data-hold="true"`. A shorter press is a tap. Space and Enter toggle. With a bound text field, the mic does not take
+  the focus on a mouse press, so the caret stays in the field.
+- **Text field** (`use_dictation`). The text goes to the caret, or replaces the selection, at the start of a
+  session; without focus, to the end. The draft shows in the field and is replaced in place. One space goes
+  before the text when needed, and the first letter is capitalized at the start and after `.`, `!` or `?`.
+  If you edit the field while a draft shows, the draft goes away, and the next segments go to your caret.
+  Each change fires an `input` event. A final segment is inserted with `execCommand('insertText')` while the
+  field has focus, so Cmd/Ctrl+Z removes it in one step; drafts are not on the undo stack. When the field has
+  no focus (for example after a keyboard press of the mic), the text goes to the end through the value
+  setter, and undo cannot remove it. `Esc` in the field stops.
+  The pill then shows no draft text, because the field shows it.
 - **Progress.** The pill shows "Loading model 42%" while the engine reports a fraction, and "Loading
   model…" while the size is unknown; it never invents a percentage.
 - **Motion.** The waveform and the mic level animate inside the page, so no Rust render or desktop IPC message

@@ -14,7 +14,7 @@ pub(crate) async fn open_capture(_sink: UnboundedSender<Vec<f32>>) -> Result<Cap
     Err(ErrorCode::Unsupported)
 }
 
-pub(crate) fn default_engine(_model_base_url: Option<String>) -> EngineHandle {
+pub(crate) fn default_engine(_model_base_url: Option<String>, _device: crate::engine::Device) -> EngineHandle {
     EngineHandle::new(UnsupportedEngine)
 }
 

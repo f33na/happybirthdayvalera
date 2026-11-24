@@ -23,7 +23,8 @@ thread_local! {
 }
 
 /// `model_base_url` arrives normalized, so one host maps to one key.
-pub(crate) fn default_engine(model_base_url: Option<String>) -> EngineHandle {
+/// `device` is a web worker setting; whisper.cpp picks its backend at build time (`metal`).
+pub(crate) fn default_engine(model_base_url: Option<String>, _device: crate::engine::Device) -> EngineHandle {
     let Some(base) = model_base_url else { return ENGINE.with(Clone::clone) };
     HOSTED.with_borrow_mut(|hosted| {
         hosted

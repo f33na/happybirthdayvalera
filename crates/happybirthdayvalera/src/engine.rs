@@ -70,6 +70,31 @@ impl ModelSize {
     }
 }
 
+/// Where the web worker runs Whisper. Desktop ignores it: whisper.cpp picks its backend at build time.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+pub enum Device {
+    /// The worker decides: WebGPU for `base` when the models are self-hosted and the browser has an adapter,
+    /// else WebAssembly. The `load` message then carries no `device`.
+    #[default]
+    Auto,
+    /// WebGPU; a failure to load does not fall back.
+    Webgpu,
+    /// WebAssembly, threaded when the page is cross-origin isolated.
+    Wasm,
+}
+
+impl Device {
+    /// `auto`, `webgpu` or `wasm`.
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Device::Auto => "auto",
+            Device::Webgpu => "webgpu",
+            Device::Wasm => "wasm",
+        }
+    }
+}
+
 /// Adds the trailing `/` that the model URL layout needs: every file URL is the base plus a relative path.
 pub(crate) fn normalize_base_url(url: &str) -> String {
     if url.ends_with('/') { url.to_owned() } else { format!("{url}/") }

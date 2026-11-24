@@ -3,7 +3,8 @@
 A small "voice dictation composer" screen on the evinvest Dioxus kit (`ev_lib::uikit_dioxus`):
 
 - a kit `Card` with a title and a kit `Badge` with the active language,
-- a kit `Textarea` in a `FormItem`, which each final transcript appends to,
+- a kit `Textarea` in a `FormItem`, bound with `use_dictation`. The kit sets the id of the textarea, so the
+  binding names a wrapper `div` and finds the textarea inside it,
 - a toolbar row with `EvMicButton`, `EvListenerPill` while the pill is visible, and a kit `Button` to send,
 - a kit `Switch` for light mode. The kit is dark by default, and `.light` on a wrapper switches it.
 
@@ -21,7 +22,8 @@ stays so until EV-Main/web_std drops that feature from both crates. The real `li
 
 To load the models from a local host instead of the Hugging Face Hub, run `just fetch-models` and
 `just serve-models`, then start the stand with `HBV_MODEL_BASE_URL=http://localhost:5299/`. The stand reads
-the variable at build time.
+the variable at build time. With self-hosted models it uses Whisper `base`; set `HBV_MODEL=tiny` (or `small`)
+to pick another size.
 
 ## What it proves
 
